@@ -11,9 +11,10 @@ using System.Windows.Forms;
 namespace ProjectClient
 {
     public class TcpServerCommunication
-    {
-        // this class is incharge of communicaiting with the server
+    {// this class is incharge of communicaiting with the server
 
+
+        public string firstName = "";
         /// <summary>
         /// this property contains the port that the server runs on
         /// </summary>
@@ -47,7 +48,8 @@ namespace ProjectClient
         /// <summary>
         /// this property is an object that will handle all messages
         /// </summary>
-        private MessageHandler messageHandler;
+        public MessageHandler messageHandler;
+
         /// <summary>
         /// constructor. gives the property 'communicationProtocol' the same spot in the memory as the ManageHathatulClient communicationProtocol
         /// </summary>
@@ -94,21 +96,22 @@ namespace ProjectClient
                 NetworkStream ns = tcpClient.GetStream();
                 byte[] data;
 
-                if (!isInitialConnectionComplete)
+                if (!isInitialConnectionComplete || !usernameSent)
                 {
                     string message = $"{command}\n{arguments}\r";
                     data = Encoding.UTF8.GetBytes(message);
+                    Console.WriteLine($"Sent: Command={command},Arguments={arguments}");
                 }
                 else
                 {
                     string encryptedMessage = communicationProtocol.ToProtocol(command, arguments);
                     data = Encoding.UTF8.GetBytes(encryptedMessage);
+                    Console.WriteLine($"Sent: Command={command},Username={TcpCommunicationProtocol.myUsername}, Arguments={arguments}");
                 }
 
                 ns.Write(data, 0, data.Length);
                 ns.Flush();
 
-                Console.WriteLine($"Sent: Command={command},Username={TcpCommunicationProtocol.myUsername}, Arguments={arguments}");
             }
             catch (Exception ex)
             {
