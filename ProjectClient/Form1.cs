@@ -17,21 +17,23 @@ namespace ProjectClient
         {
             InitializeComponent();
             tcpServer = new TcpServerCommunication();
-
+            Console.WriteLine("Attempting to connect");
+            tcpServer.ConnectToServer();
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            if (!tcpServer.IsConnected)
+            if (!tcpServer.usernameSent)
             {
-                Console.WriteLine("Attempting to connect");
-                tcpServer.ConnectToServer("Hello");
+                Console.WriteLine("sending username");
+                tcpServer.HandleUsernameMessage("hello");
             }
             else
             {
                 Console.WriteLine("sending test message");
-                tcpServer.SendMessage("nigga", "Test message");
-                tcpServer.SendMessage("WhatsUp", "Test message");
+
+               // tcpServer.SendMessage("nigga", "Test message");
+               // tcpServer.SendMessage("WhatsUp", "Test message");
 
             }
         }

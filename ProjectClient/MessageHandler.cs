@@ -24,7 +24,7 @@ namespace ProjectClient
             switch (message.Command)
             {
                 case "UsernameAccepted":
-                    session.IsConnected = true;
+                    session.usernameSent = true;
                     MessageBox.Show(message.Arguments);
                     break;
                 case "ERROR":

@@ -43,7 +43,7 @@ namespace ProjectClient
         /// <summary>
         /// this property is to check where this client is connected  to server
         /// </summary>
-        public bool IsConnected = false;
+        public bool usernameSent = false;
         /// <summary>
         /// this property is an object that will handle all messages
         /// </summary>
@@ -61,12 +61,10 @@ namespace ProjectClient
         /// this function creates the connection with the server. Connects the client to the server
         /// </summary>
         /// <param name="nickname"></param>
-        public void ConnectToServer(string nickname)
+        public void ConnectToServer()
         {
             try
             {
-
-                TcpCommunicationProtocol.myUsername = nickname;
                 tcpClient = new TcpClient();
                 tcpClient.Connect(ipAddress, portNo);
                 data = new byte[tcpClient.ReceiveBufferSize];
@@ -168,7 +166,6 @@ namespace ProjectClient
                 string encryptedAesKey = parts[1].TrimEnd('\r');
                 communicationProtocol.SetAesKey(encryptedAesKey);
                 isInitialConnectionComplete = true;
-                HandleUsernameMessage();
             }
             else if (parts.Length >= 2 && parts[0] == "ERROR")
             {
@@ -192,8 +189,9 @@ namespace ProjectClient
         /// <summary>
         /// this function is responsible for calling the function that will send username
         /// </summary>
-        private void HandleUsernameMessage()
+        public void HandleUsernameMessage(string username)
         {
+            communicationProtocol.MyUsername = username;
             messageHandler.SendEncryptedUsername();
         }
 
@@ -204,7 +202,7 @@ namespace ProjectClient
         /// </summary>
         public void Disconnect()
         {
-            if (!IsConnected)
+            if (!usernameSent)
             {
                 Console.WriteLine("Not connected to server.");
                 return;
@@ -221,7 +219,7 @@ namespace ProjectClient
             }
             finally
             {
-                IsConnected = false;
+                usernameSent = false;
                 isInitialConnectionComplete = false;
                 Console.WriteLine("Disconnected from server");
             }
