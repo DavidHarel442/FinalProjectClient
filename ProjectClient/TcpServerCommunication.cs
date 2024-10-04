@@ -10,7 +10,7 @@ using System.Windows.Forms;
 
 namespace ProjectClient
 {
-    internal class TcpServerCommunication
+    public class TcpServerCommunication
     {
         // this class is incharge of communicaiting with the server
 
@@ -35,14 +35,19 @@ namespace ProjectClient
         /// <summary>
         /// this property contains the object that is used to communicate with the server
         /// </summary>
-        private TcpCommunicationProtocol communicationProtocol = null;
+        public TcpCommunicationProtocol communicationProtocol = null;
         /// <summary>
         /// this property is to check if the communication is encrypted with keys transfered and communication encryption with RSA and then AES
         /// </summary>
-        private bool isInitialConnectionComplete = false;
-        private string currentUsername;
+        public bool isInitialConnectionComplete = false;
+        /// <summary>
+        /// this property is to check where this client is connected  to server
+        /// </summary>
         public bool IsConnected = false;
-
+        /// <summary>
+        /// this property is an object that will handle all messages
+        /// </summary>
+        private MessageHandler messageHandler;
         /// <summary>
         /// constructor. gives the property 'communicationProtocol' the same spot in the memory as the ManageHathatulClient communicationProtocol
         /// </summary>
@@ -50,8 +55,8 @@ namespace ProjectClient
         public TcpServerCommunication()
         {
             this.communicationProtocol = new TcpCommunicationProtocol();
+            messageHandler = new MessageHandler(this);
         }
-        private static int connectionAttempts = 0;
         /// <summary>
         /// this function creates the connection with the server. Connects the client to the server
         /// </summary>
@@ -60,8 +65,8 @@ namespace ProjectClient
         {
             try
             {
-                
-                currentUsername = nickname;
+
+                TcpCommunicationProtocol.myUsername = nickname;
                 tcpClient = new TcpClient();
                 tcpClient.Connect(ipAddress, portNo);
                 data = new byte[tcpClient.ReceiveBufferSize];
@@ -145,8 +150,9 @@ namespace ProjectClient
 
                 tcpClient.GetStream().BeginRead(data, 0, System.Convert.ToInt32(tcpClient.ReceiveBufferSize), ReceiveMessage, null);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Console.WriteLine($"Error in ReceiveMessage: {ex.Message}");
                 // Handle disconnection or other errors
             }
         }
@@ -162,46 +168,35 @@ namespace ProjectClient
                 string encryptedAesKey = parts[1].TrimEnd('\r');
                 communicationProtocol.SetAesKey(encryptedAesKey);
                 isInitialConnectionComplete = true;
-                SendEncryptedUsername();
+                HandleUsernameMessage();
+            }
+            else if (parts.Length >= 2 && parts[0] == "ERROR")
+            {
+                Console.WriteLine($"Error from server: {parts[1]}");
+                // Handle the error appropriately
             }
             else
             {
-                MessageBox.Show("Invalid initial response from server");
-                Disconnect();
+                Console.WriteLine("Invalid initial response from server");
+                // Handle invalid response
             }
         }
-        private void SendEncryptedUsername()
-        {
-            string encodedUsername = Convert.ToBase64String(Encoding.UTF8.GetBytes(currentUsername));
-            SendMessage("USERNAME", encodedUsername);
-        }
         /// <summary>
-        /// this function handles the messages
+        /// this function is responsible for calling the function that will handle the acceptence of messages
         /// </summary>
         /// <param name="message"></param>
         private void HandleMessage(TcpCommunicationProtocol message)
         {
-            Console.WriteLine($"Handling message: Command={message.Command},Username={communicationProtocol.MyUsername} Arguments={message.Arguments}");
-            switch (message.Command)
-            {
-                case "CHAT":
-                    // Handle chat message
-                    break;
-                case "USER_JOINED":
-                    // Handle user joined notification
-                    break;
-                case "OK":
-                    IsConnected = true;
-                    communicationProtocol.MyUsername = currentUsername;
-                    MessageBox.Show(message.Arguments); break;
-                case "ERROR":
-                    MessageBox.Show($"Error: {message.Arguments}");
-                    break;
-                default:
-                    Console.WriteLine($"Unknown command received: {message.Command}");
-                    break;
-            }
+            messageHandler.HandleMessage(message);
         }
+        /// <summary>
+        /// this function is responsible for calling the function that will send username
+        /// </summary>
+        private void HandleUsernameMessage()
+        {
+            messageHandler.SendEncryptedUsername();
+        }
+
 
 
         /// <summary>

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ProjectClient
 {
-    internal class EncryptionManager
+    public class EncryptionManager
     {// this class manages the communication encryption between server and client
         private RSAEncryption rsaEncryption;
         private AESEncryption aesEncryption;

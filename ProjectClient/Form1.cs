@@ -34,7 +34,6 @@ namespace ProjectClient
                 tcpServer.SendMessage("WhatsUp", "Test message");
 
             }
-
         }
     }
 }

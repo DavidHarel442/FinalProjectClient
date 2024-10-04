@@ -45,7 +45,7 @@ namespace ProjectClient
                             TcpCommunicationProtocol protocol = new TcpCommunicationProtocol
                             {
                                 Command = parts[0],
-                                Arguments = parts.Length >= 3 ? string.Join("\n", parts.Skip(2)) : parts[1]
+                                Arguments = parts.Length >= 2 ? string.Join("\n", parts.Skip(1)) : parts[0]
                             };
                             messages.Add(protocol);
                         }
@@ -55,12 +55,12 @@ namespace ProjectClient
                         Console.WriteLine($"Error decrypting message: {ex.Message}");
                         // Handle unencrypted messages (e.g., initial connection messages)
                         string[] parts = encryptedMessage.Split('\n');
-                        if (parts.Length >= 2)
+                        if (parts.Length >= 1)
                         {
                             TcpCommunicationProtocol protocol = new TcpCommunicationProtocol
                             {
                                 Command = parts[0],
-                                Arguments = string.Join("\n", parts.Skip(1))
+                                Arguments = string.Join("\n", parts.Skip(0))
                             };
                             messages.Add(protocol);
                         }
