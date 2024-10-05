@@ -17,7 +17,7 @@ namespace ProjectClient
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             TcpServerCommunication tcpServer = new TcpServerCommunication();
-            Application.Run(new LoginForm(tcpServer));
+            Application.Run(new LoginForm(tcpServer,true));
         }
     }
 }

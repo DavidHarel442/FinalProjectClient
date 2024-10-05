@@ -64,6 +64,7 @@
             this.ChangePassword.TabIndex = 80;
             this.ChangePassword.Text = "Change Password";
             this.ChangePassword.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.ChangePassword.Click += new System.EventHandler(this.ChangePassword_Click);
             // 
             // f
             // 
@@ -90,6 +91,7 @@
             this.ClrearFields.TabIndex = 78;
             this.ClrearFields.Text = "Clear";
             this.ClrearFields.UseVisualStyleBackColor = false;
+            this.ClrearFields.Click += new System.EventHandler(this.ClrearFields_Click);
             // 
             // CreateAccount
             // 
@@ -157,7 +159,7 @@
             this.password.PasswordChar = '•';
             this.password.Size = new System.Drawing.Size(216, 28);
             this.password.TabIndex = 73;
-            this.password.Text = "David12345!";
+            this.password.Text = "David12345!!";
             // 
             // username
             // 
@@ -213,7 +215,7 @@
             this.Font = new System.Drawing.Font("Nirmala UI", 9.75F, System.Drawing.FontStyle.Bold);
             this.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(164)))), ((int)(((byte)(165)))), ((int)(((byte)(169)))));
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "LoginForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Login";

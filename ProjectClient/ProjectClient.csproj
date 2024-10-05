@@ -48,6 +48,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AESEncryption.cs" />
+    <Compile Include="ChangePasswordForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ChangePasswordForm.Designer.cs">
+      <DependentUpon>ChangePasswordForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="EncryptionManager.cs" />
     <Compile Include="HomePage.cs">
       <SubType>Form</SubType>
@@ -73,6 +79,15 @@
     <Compile Include="RSAEncryption.cs" />
     <Compile Include="TcpCommunicationProtocol.cs" />
     <Compile Include="TcpServerCommunication.cs" />
+    <Compile Include="TripleAuthentication.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="TripleAuthentication.Designer.cs">
+      <DependentUpon>TripleAuthentication.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="ChangePasswordForm.resx">
+      <DependentUpon>ChangePasswordForm.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="HomePage.resx">
       <DependentUpon>HomePage.cs</DependentUpon>
     </EmbeddedResource>
@@ -91,6 +106,9 @@
     </Compile>
     <EmbeddedResource Include="RegisterForm.resx">
       <DependentUpon>RegisterForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="TripleAuthentication.resx">
+      <DependentUpon>TripleAuthentication.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>

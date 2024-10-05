@@ -88,6 +88,7 @@
             this.ClearFields.TabIndex = 76;
             this.ClearFields.Text = "Clear";
             this.ClearFields.UseVisualStyleBackColor = false;
+            this.ClearFields.Click += new System.EventHandler(this.ClearFields_Click);
             // 
             // GetStartedLabel
             // 

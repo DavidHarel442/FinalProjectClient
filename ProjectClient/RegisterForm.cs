@@ -30,8 +30,8 @@ namespace ProjectClient
         {
             InitializeComponent();
             this.tcpServer = client;
+            MessageHandler.SetCurrentForm(this);
 
-            tcpServer.messageHandler.RegistrationSuccess += OnRegistrationSuccess;
         }
         /// <summary>
         /// this function checks if all the boxes for the register are filled
@@ -145,7 +145,11 @@ namespace ProjectClient
                 }
                 Thread.Sleep(1000);
                 string data = username.Text + "\t" + password.Text + "\t" + firstname.Text + "\t" + lastname.Text + "\t" + emailTextBox.Text + "\t" + city.Text + "\t" + gender.Text;
-                tcpServer.SendMessage("Register",data);
+                TripleAuthentication triple = new TripleAuthentication(tcpServer, false,data);
+                tcpServer.SendMessage("SendAuthentication", emailTextBox.Text);// going to the two/three step authentication
+                this.Hide();
+                triple.ShowDialog();
+
             }
         }
         /// <summary>
@@ -155,23 +159,26 @@ namespace ProjectClient
         /// <param name="e"></param>
         private void BackToLogin_Click(object sender, EventArgs e)
         {
-            LoginForm BackToGame = new LoginForm(tcpServer);
+            LoginForm BackToGame = new LoginForm(tcpServer,false);
             this.Hide();
             BackToGame.ShowDialog();
         }
 
-
-
-        private void OnRegistrationSuccess(object sender, string message)
+        /// <summary>
+        /// this function clears the fields
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void ClearFields_Click(object sender, EventArgs e)
         {
-            this.Invoke((MethodInvoker)delegate {
-                MessageBox.Show($"Registration Successful: {message}");
-                HomePage homePage = new HomePage(tcpServer);
-                homePage.Show();
-                this.Hide();
-            });
+            this.username.Clear();
+            this.password.Clear();
+            this.firstname.Clear();
+            this.lastname.Clear();
+            this.emailTextBox.Clear();
+            this.city.Text = "";
+            this.gender.Text = "";
+            this.username.Focus();
         }
-
-
     }
 }

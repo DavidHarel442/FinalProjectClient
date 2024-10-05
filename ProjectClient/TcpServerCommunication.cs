@@ -86,7 +86,7 @@ namespace ProjectClient
 
 
         /// <summary>
-        /// this funcion is used when the player send a message. it converts the string into bytes and sends it using the Tcp Protocol
+        /// this funcion is used when the client send a message. it converts the string into bytes and sends it using the Tcp Protocol
         /// </summary>
         /// <param name="message"></param>
         public void SendMessage(string command, string arguments)

@@ -23,6 +23,7 @@ namespace ProjectClient
         {
             InitializeComponent();
             tcpServer = client;
+            MessageHandler.SetCurrentForm(this);
         }
     }
 }
