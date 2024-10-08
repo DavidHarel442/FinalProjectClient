@@ -78,6 +78,7 @@
     </Compile>
     <Compile Include="RSAEncryption.cs" />
     <Compile Include="TcpCommunicationProtocol.cs" />
+    <Compile Include="TcpProtocolMessage.cs" />
     <Compile Include="TcpServerCommunication.cs" />
     <Compile Include="TripleAuthentication.cs">
       <SubType>Form</SubType>

@@ -106,7 +106,7 @@ namespace ProjectClient
                 {
                     string encryptedMessage = communicationProtocol.ToProtocol(command, arguments);
                     data = Encoding.UTF8.GetBytes(encryptedMessage);
-                    Console.WriteLine($"Sent: Command={command},Username={TcpCommunicationProtocol.myUsername}, Arguments={arguments}");
+                    Console.WriteLine($"Sent: Command={command},Username={TcpProtocolMessage.myUsername}, Arguments={arguments}");
                 }
 
                 ns.Write(data, 0, data.Length);
@@ -142,8 +142,8 @@ namespace ProjectClient
                 }
                 else
                 {
-                    List<TcpCommunicationProtocol> messages = communicationProtocol.FromProtocol(textFromServer);
-                    foreach (TcpCommunicationProtocol message in messages)
+                    List<TcpProtocolMessage> messages = communicationProtocol.FromProtocol(textFromServer);
+                    foreach (TcpProtocolMessage message in messages)
                     {
                         HandleMessage(message);
                     }
@@ -185,7 +185,7 @@ namespace ProjectClient
         /// this function is responsible for calling the function that will handle the acceptence of messages
         /// </summary>
         /// <param name="message"></param>
-        private void HandleMessage(TcpCommunicationProtocol message)
+        private void HandleMessage(TcpProtocolMessage message)
         {
             messageHandler.HandleMessage(message);
         }
@@ -194,7 +194,7 @@ namespace ProjectClient
         /// </summary>
         public void HandleUsernameMessage(string username)
         {
-            communicationProtocol.MyUsername = username;
+            TcpProtocolMessage.myUsername = username;
             messageHandler.SendEncryptedUsername();
         }
 

@@ -8,9 +8,7 @@ namespace ProjectClient
 {
     public class TcpCommunicationProtocol
     {
-        private string command;
-        public static string myUsername;
-        private string arguments;
+        
         private EncryptionManager encryptionManager;
 
         public TcpCommunicationProtocol()
@@ -18,19 +16,17 @@ namespace ProjectClient
             encryptionManager = new EncryptionManager();
         }
 
-        public string MyUsername { get => myUsername; set => myUsername = value; }
-        public string Command { get => command; set => command = value; }
-        public string Arguments { get => arguments; set => arguments = value; }
+        
 
         public string ToProtocol(string command, string arguments)
         {
-            string message = $"{command}\n{myUsername}\n{arguments}";
+            string message = $"{command}\n{TcpProtocolMessage.myUsername}\n{arguments}";
             return encryptionManager.EncryptMessage(message) + '\r';
         }
 
-        public List<TcpCommunicationProtocol> FromProtocol(string text)
+        public List<TcpProtocolMessage> FromProtocol(string text)
         {
-            List<TcpCommunicationProtocol> messages = new List<TcpCommunicationProtocol>();
+            List<TcpProtocolMessage> messages = new List<TcpProtocolMessage>();
             string[] encryptedMessages = text.Split('\r');
             foreach (string encryptedMessage in encryptedMessages)
             {
@@ -42,12 +38,12 @@ namespace ProjectClient
                         string[] parts = decryptedMessage.Split('\n');
                         if (parts.Length >= 2)
                         {
-                            TcpCommunicationProtocol protocol = new TcpCommunicationProtocol
+                            TcpProtocolMessage message = new TcpProtocolMessage
                             {
                                 Command = parts[0],
                                 Arguments = parts.Length >= 2 ? string.Join("\n", parts.Skip(1)) : parts[0]
                             };
-                            messages.Add(protocol);
+                            messages.Add(message);
                         }
                     }
                     catch (Exception ex)
@@ -57,12 +53,12 @@ namespace ProjectClient
                         string[] parts = encryptedMessage.Split('\n');
                         if (parts.Length >= 1)
                         {
-                            TcpCommunicationProtocol protocol = new TcpCommunicationProtocol
+                            TcpProtocolMessage message = new TcpProtocolMessage
                             {
                                 Command = parts[0],
                                 Arguments = string.Join("\n", parts.Skip(0))
                             };
-                            messages.Add(protocol);
+                            messages.Add(message);
                         }
                     }
                 }

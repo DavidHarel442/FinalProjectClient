@@ -41,7 +41,7 @@ namespace ProjectClient
         /// this function handles the messages
         /// </summary>
         /// <param name="message"></param>
-        public void HandleMessage(TcpCommunicationProtocol message)
+        public void HandleMessage(TcpProtocolMessage message)
         {
             Console.WriteLine($"Handling message: Command={message.Command},Arguments={message.Arguments}");
             switch (message.Command)
@@ -165,7 +165,7 @@ namespace ProjectClient
         {
             try
             {
-                string encodedUsername = Convert.ToBase64String(Encoding.UTF8.GetBytes(session.communicationProtocol.MyUsername));
+                string encodedUsername = Convert.ToBase64String(Encoding.UTF8.GetBytes(TcpProtocolMessage.myUsername));
                 session.SendMessage("USERNAME", encodedUsername);
                 Console.WriteLine($"Sent encrypted username: {encodedUsername}");
             }
