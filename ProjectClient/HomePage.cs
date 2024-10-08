@@ -25,5 +25,12 @@ namespace ProjectClient
             tcpServer = client;
             MessageHandler.SetCurrentForm(this);
         }
+
+        private void OpenDrawingForm_Click(object sender, EventArgs e)
+        {
+            SharedDrawingForm sharedDrawing = new SharedDrawingForm(tcpServer);
+            this.Hide();
+            sharedDrawing.ShowDialog();
+        }
     }
 }

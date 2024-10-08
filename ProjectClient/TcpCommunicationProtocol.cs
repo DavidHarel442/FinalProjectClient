@@ -71,28 +71,9 @@ namespace ProjectClient
             return encryptionManager.GetPublicKey();
         }
 
-        public void SetClientPublicKey(string publicKey)
-        {
-            encryptionManager.SetClientPublicKey(publicKey);
-        }
-
-        public string GetEncryptedAesKey()
-        {
-            return encryptionManager.GetEncryptedAesKey();
-        }
-
         public void SetAesKey(string encryptedAesKey)
         {
             encryptionManager.SetAesKey(encryptedAesKey);
-        }
-        public string EncryptMessage(string message)
-        {
-            return encryptionManager.EncryptMessage(message);
-        }
-
-        public string DecryptMessage(string encryptedMessage)
-        {
-            return encryptionManager.DecryptMessage(encryptedMessage);
         }
     }
 }
