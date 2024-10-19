@@ -83,8 +83,8 @@ namespace ProjectClient
                 videoSource.SignalToStop();
                 videoSource.WaitForStop();
             }
-            displayPictureBox.Image?.Dispose();
             displayPictureBox.Image = null;
+            displayPictureBox.Image?.Dispose();
         }
     }
 }

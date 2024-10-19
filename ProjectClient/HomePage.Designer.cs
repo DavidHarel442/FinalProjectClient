@@ -29,6 +29,7 @@
         private void InitializeComponent()
         {
             this.OpenDrawingForm = new System.Windows.Forms.Button();
+            this.username = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // OpenDrawingForm
@@ -48,18 +49,32 @@
             this.OpenDrawingForm.UseVisualStyleBackColor = false;
             this.OpenDrawingForm.Click += new System.EventHandler(this.OpenDrawingForm_Click);
             // 
+            // username
+            // 
+            this.username.AutoSize = true;
+            this.username.Font = new System.Drawing.Font("Nirmala UI", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.username.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(164)))), ((int)(((byte)(165)))), ((int)(((byte)(169)))));
+            this.username.Location = new System.Drawing.Point(0, 9);
+            this.username.Name = "username";
+            this.username.Size = new System.Drawing.Size(68, 17);
+            this.username.TabIndex = 81;
+            this.username.Text = "username";
+            // 
             // HomePage
             // 
             this.ClientSize = new System.Drawing.Size(582, 500);
+            this.Controls.Add(this.username);
             this.Controls.Add(this.OpenDrawingForm);
             this.Name = "HomePage";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
         #endregion
 
         private System.Windows.Forms.Button OpenDrawingForm;
+        private System.Windows.Forms.Label username;
     }
 }

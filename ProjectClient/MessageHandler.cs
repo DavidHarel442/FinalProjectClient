@@ -1,5 +1,8 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -16,7 +19,11 @@ namespace ProjectClient
         /// </summary>
         private TcpServerCommunication session;
 
-
+        private static DrawingManager drawingManager;
+        public static void SetDrawingManager(DrawingManager drawingManager)
+        {
+            MessageHandler.drawingManager = drawingManager;
+        }
         /// <summary>
         /// this property will contain the current open form.
         /// </summary>
@@ -50,26 +57,24 @@ namespace ProjectClient
                     session.usernameSent = true;
                     break;
                 case "Registered":
-                    session.firstName = message.Arguments;
                     SafeInvoke(() => {
                         MessageBox.Show("Registered Successfully");
                         if (MessageHandler.currentForm != null)
                         {
                             MessageHandler.currentForm.Hide();
-                            HomePage homePage = new HomePage(session);
+                            HomePage homePage = new HomePage(session, message.Arguments);
                             homePage.Show();
                         }
                         
                     });
                     break;
                 case "LoggedIn":
-                    session.firstName = message.Arguments;
                     SafeInvoke(() => {
                         if (MessageHandler.currentForm != null)
                         {
                             MessageBox.Show("Logged In Successfully");
                             MessageHandler.currentForm.Hide();
-                            HomePage homePage = new HomePage(session);
+                            HomePage homePage = new HomePage(session, message.Arguments);
                             homePage.Show();
 
                         }
@@ -82,6 +87,28 @@ namespace ProjectClient
                             tripleAuth.UpdateCaptchaImage(message.Arguments);
                         }
                     });
+                    break;
+                case "DrawingUpdate":
+                    if (currentForm is SharedDrawingForm sharedDrawingForm)
+                    {
+                        DrawingAction action = DrawingAction.Deserialize(message.Arguments);
+                        sharedDrawingForm.ApplyDrawingAction(action);
+                    }
+                    break;
+                case "FullDrawingState":
+                    if (currentForm is SharedDrawingForm sharedDrawingForm12)
+                    {
+                        sharedDrawingForm12.HandleFullDrawingState(message.Arguments);
+                    }
+                    break;
+                case "SendFullDrawingState":
+                    if (currentForm is SharedDrawingForm sharedDrawingForm123)
+                    {
+                        sharedDrawingForm123.SendFullDrawingState(message.Arguments);
+                    }
+                    break;
+                case "DrawingStateUpdate":
+                    HandleReceivedDrawingState(message.Arguments);
                     break;
                 case "Success":
                     MessageBox.Show($"Success: {message.Arguments}");
@@ -99,6 +126,20 @@ namespace ProjectClient
                     break;
             }
         }
+        private void HandleReceivedDrawingState(string base64Image)
+        {
+            byte[] imageData = Convert.FromBase64String(base64Image);
+            using (MemoryStream ms = new MemoryStream(imageData))
+            {
+                // Convert the Base64 string back to a Bitmap and display it
+                Bitmap receivedBitmap = new Bitmap(ms);
+
+                // Apply the received bitmap to the drawing PictureBox
+                drawingManager.drawingPic.Image = receivedBitmap;
+                drawingManager.drawingPic.Invalidate();  // Redraw the PictureBox
+            }
+        }
+        
         /// <summary>
         /// handles all issues.
         /// </summary>

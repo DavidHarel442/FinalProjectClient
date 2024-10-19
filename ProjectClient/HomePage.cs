@@ -19,18 +19,21 @@ namespace ProjectClient
         /// <summary>
         /// defualt constructor which Initialize the form
         /// </summary>
-        public HomePage(TcpServerCommunication client)
+        public HomePage(TcpServerCommunication client,string firstname)
         {
             InitializeComponent();
             tcpServer = client;
+            username.Text = firstname;
             MessageHandler.SetCurrentForm(this);
         }
 
         private void OpenDrawingForm_Click(object sender, EventArgs e)
         {
-            SharedDrawingForm sharedDrawing = new SharedDrawingForm(tcpServer);
-            this.Hide();
-            sharedDrawing.ShowDialog();
+                SharedDrawingForm sharedDrawing = new SharedDrawingForm(tcpServer, username.Text);
+                tcpServer.SendMessage("OpenedDrawing", "");
+                this.Hide();
+                sharedDrawing.ShowDialog();
+            
         }
     }
 }
