@@ -69,7 +69,6 @@
     </Compile>
     <Compile Include="DrawingAction.cs" />
     <Compile Include="DrawingManager.cs" />
-    <Compile Include="DrawingState.cs" />
     <Compile Include="EncryptionManager.cs" />
     <Compile Include="HomePage.cs">
       <SubType>Form</SubType>

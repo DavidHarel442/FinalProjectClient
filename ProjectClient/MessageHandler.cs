@@ -18,12 +18,6 @@ namespace ProjectClient
         /// a property sent through each class starting from HathatulClient. which you use to communicate with the server
         /// </summary>
         private TcpServerCommunication session;
-
-        private static DrawingManager drawingManager;
-        public static void SetDrawingManager(DrawingManager drawingManager)
-        {
-            MessageHandler.drawingManager = drawingManager;
-        }
         /// <summary>
         /// this property will contain the current open form.
         /// </summary>
@@ -89,26 +83,17 @@ namespace ProjectClient
                     });
                     break;
                 case "DrawingUpdate":
-                    if (currentForm is SharedDrawingForm sharedDrawingForm)
-                    {
-                        DrawingAction action = DrawingAction.Deserialize(message.Arguments);
-                        sharedDrawingForm.ApplyDrawingAction(action);
-                    }
+                    DrawingAction action = DrawingAction.Deserialize(message.Arguments);
+                    if(currentForm is SharedDrawingForm form)
+                        SafeInvoke(() => form.ApplyDrawingAction(action));
                     break;
                 case "FullDrawingState":
-                    if (currentForm is SharedDrawingForm sharedDrawingForm12)
-                    {
-                        sharedDrawingForm12.HandleFullDrawingState(message.Arguments);
-                    }
+                    if (currentForm is SharedDrawingForm form1)
+                        SafeInvoke(() => form1.HandleFullDrawingState(message.Arguments));
                     break;
                 case "SendFullDrawingState":
-                    if (currentForm is SharedDrawingForm sharedDrawingForm123)
-                    {
-                        sharedDrawingForm123.SendFullDrawingState(message.Arguments);
-                    }
-                    break;
-                case "DrawingStateUpdate":
-                    HandleReceivedDrawingState(message.Arguments);
+                    if (currentForm is SharedDrawingForm form2)
+                        SafeInvoke(() => form2.SendFullDrawingState(message.Arguments));
                     break;
                 case "Success":
                     MessageBox.Show($"Success: {message.Arguments}");
@@ -124,19 +109,6 @@ namespace ProjectClient
                 default:
                     Console.WriteLine($"Unknown command received: {message.Command}");
                     break;
-            }
-        }
-        private void HandleReceivedDrawingState(string base64Image)
-        {
-            byte[] imageData = Convert.FromBase64String(base64Image);
-            using (MemoryStream ms = new MemoryStream(imageData))
-            {
-                // Convert the Base64 string back to a Bitmap and display it
-                Bitmap receivedBitmap = new Bitmap(ms);
-
-                // Apply the received bitmap to the drawing PictureBox
-                drawingManager.drawingPic.Image = receivedBitmap;
-                drawingManager.drawingPic.Invalidate();  // Redraw the PictureBox
             }
         }
         

@@ -32,17 +32,6 @@ namespace ProjectClient
             GenerateKey();
         }
         /// <summary>
-        /// Initializes a new instance of the AESEncryption class with a provided key.
-        /// </summary>
-        /// <param name="key"></param>
-        /// <exception cref="ArgumentException"></exception>
-        public AESEncryption(byte[] key)
-        {
-            if (key.Length * 8 != KeySize)
-                throw new ArgumentException($"Key size must be {KeySize} bits.");
-            Key = key;
-        }
-        /// <summary>
         /// Generates a new random encryption key.
         /// </summary>
         public void GenerateKey()

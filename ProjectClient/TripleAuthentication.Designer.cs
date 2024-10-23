@@ -141,7 +141,6 @@
             this.Name = "TripleAuthentication";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "TripleAuthentication";
-            this.Load += new System.EventHandler(this.TripleAuthentication_Load);
             ((System.ComponentModel.ISupportInitialize)(this.captchaImage)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();

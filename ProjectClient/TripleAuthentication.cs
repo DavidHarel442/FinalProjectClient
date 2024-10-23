@@ -25,6 +25,12 @@ namespace ProjectClient
         /// a property sent through each class starting from Program. which the client uses to communicate with the server
         /// </summary>
         private TcpServerCommunication tcpServer;
+        /// <summary>
+        /// constructor, initializes the TripleAuthentication form.
+        /// </summary>
+        /// <param name="tcpServer"></param>
+        /// <param name="loginOrRegister"></param>
+        /// <param name="allInfo"></param>
         public TripleAuthentication(TcpServerCommunication tcpServer, bool loginOrRegister,string allInfo) // this boolean will be true if its a login attempt and false if its a register one
         {
             InitializeComponent();
@@ -34,10 +40,12 @@ namespace ProjectClient
             this.loginOrRegister    = loginOrRegister;
         }
 
-        private void TripleAuthentication_Load(object sender, EventArgs e)
-        {
-
-        }
+        /// <summary>
+        /// shows the captcha image.
+        /// it is doing so by converting the base64 image to bytes array then puts the bytes in a memory stream
+        /// and then puts it in the picturebox
+        /// </summary>
+        /// <param name="base64Image"></param>
         public void UpdateCaptchaImage(string base64Image)//taken from claude
         {
             byte[] imageBytes = Convert.FromBase64String(base64Image);
@@ -46,6 +54,11 @@ namespace ProjectClient
                 captchaImage.Image = Image.FromStream(ms);
             }
         }
+        /// <summary>
+        /// event called when pressed on the verift button, sends the server a message with the code and captcha to authenticate
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void verify_Click(object sender, EventArgs e)
         {
             tcpServer.SendMessage("Verify",code.Text + '\t' + captcha.Text);

@@ -17,7 +17,7 @@ namespace ProjectClient
         /// </summary>
         public TcpServerCommunication tcpServer = null;
         /// <summary>
-        /// defualt constructor which Initialize the form
+        /// constructor which Initialize the form, receives the object for communication and firstname
         /// </summary>
         public HomePage(TcpServerCommunication client,string firstname)
         {
@@ -26,7 +26,11 @@ namespace ProjectClient
             username.Text = firstname;
             MessageHandler.SetCurrentForm(this);
         }
-
+        /// <summary>
+        /// event called when pressed on OpenDrawingForm button. it starts the SharedDrawingForm.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void OpenDrawingForm_Click(object sender, EventArgs e)
         {
                 SharedDrawingForm sharedDrawing = new SharedDrawingForm(tcpServer, username.Text);

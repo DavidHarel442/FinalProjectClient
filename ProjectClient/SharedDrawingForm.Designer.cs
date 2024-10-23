@@ -257,6 +257,7 @@
             this.Controls.Add(this.Camera);
             this.Name = "SharedDrawingForm";
             this.Text = "SharedDrawingForm";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SharedDrawingForm_FormClosing_1);
             ((System.ComponentModel.ISupportInitialize)(this.Camera)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.color_picker)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.drawingPic)).EndInit();

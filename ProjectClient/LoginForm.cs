@@ -27,6 +27,11 @@ namespace ProjectClient
         /// a static property incharge that if someone presses the 'ChangePassword' button it shows the form of the 'PasswordChange'.
         /// </summary>
         public ChangePasswordForm changePasswordObj = null;
+        /// <summary>
+        /// constructor, it initializes the LoginForm
+        /// </summary>
+        /// <param name="TcpServer"></param>
+        /// <param name="shouldConnect"></param>
         public LoginForm(TcpServerCommunication TcpServer,bool shouldConnect)
         {
             InitializeComponent();
@@ -40,10 +45,7 @@ namespace ProjectClient
 
 
         }
-        private void LoginForm_Load(object sender, EventArgs e)
-        {
 
-        }
         /// <summary>
         /// this function is An Event Handler that occurs when someone presses on the 'Login' Button.
         /// it sends a message to the server to check whether the username and password wrote are correct in the Sql DataBase

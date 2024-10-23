@@ -14,7 +14,6 @@ namespace ProjectClient
     {// this class is incharge of communicaiting with the server
 
 
-        public string firstName = "";
         /// <summary>
         /// this property contains the port that the server runs on
         /// </summary>
