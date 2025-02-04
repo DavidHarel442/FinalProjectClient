@@ -61,11 +61,11 @@ namespace ProjectClient
 
             }
             Thread.Sleep(1000);
-            // Comment out the TripleAuthentication part
-            // TripleAuthentication triple = new TripleAuthentication(tcpServer, true, username.Text + '\t' + password.Text);
-            // tcpServer.SendMessage("SendAuthentication", "");
-            // this.Hide();
-            // triple.ShowDialog();
+            //Comment out the TripleAuthentication part
+            //TripleAuthentication triple = new TripleAuthentication(tcpServer, true, username.Text + '\t' + password.Text);
+            //tcpServer.SendMessage("SendAuthentication", "");
+            //this.Hide();
+            //triple.ShowDialog();
 
             // Instead, directly send the login request
             tcpServer.SendMessage("Login", username.Text + '\t' + password.Text);

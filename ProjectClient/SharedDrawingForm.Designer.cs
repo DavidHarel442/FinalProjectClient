@@ -40,6 +40,8 @@
             this.btn_Clear = new System.Windows.Forms.Button();
             this.PenSize = new System.Windows.Forms.ComboBox();
             this.EraserSize = new System.Windows.Forms.ComboBox();
+            this.StartDrawing = new System.Windows.Forms.Button();
+            this.Label3 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.Camera)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.color_picker)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.drawingPic)).BeginInit();
@@ -238,11 +240,43 @@
             this.EraserSize.Text = "12";
             this.EraserSize.SelectedIndexChanged += new System.EventHandler(this.EraserSize_SelectedIndexChanged);
             // 
+            // StartDrawing
+            // 
+            this.StartDrawing.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(157)))), ((int)(((byte)(88)))));
+            this.StartDrawing.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.StartDrawing.FlatAppearance.BorderSize = 0;
+            this.StartDrawing.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.StartDrawing.Font = new System.Drawing.Font("Nirmala UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.StartDrawing.ForeColor = System.Drawing.SystemColors.Window;
+            this.StartDrawing.Location = new System.Drawing.Point(746, 338);
+            this.StartDrawing.Margin = new System.Windows.Forms.Padding(4);
+            this.StartDrawing.Name = "StartDrawing";
+            this.StartDrawing.Size = new System.Drawing.Size(223, 64);
+            this.StartDrawing.TabIndex = 94;
+            this.StartDrawing.Text = "Start Drawing";
+            this.StartDrawing.UseVisualStyleBackColor = false;
+            this.StartDrawing.Visible = false;
+            this.StartDrawing.Click += new System.EventHandler(this.StartDrawing_Click);
+            // 
+            // Label3
+            // 
+            this.Label3.AutoSize = true;
+            this.Label3.Font = new System.Drawing.Font("Nirmala UI", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.Label3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(164)))), ((int)(((byte)(165)))), ((int)(((byte)(169)))));
+            this.Label3.Location = new System.Drawing.Point(749, 317);
+            this.Label3.Name = "Label3";
+            this.Label3.Size = new System.Drawing.Size(220, 17);
+            this.Label3.TabIndex = 95;
+            this.Label3.Text = "If You Want to Draw From Camera";
+            this.Label3.Visible = false;
+            // 
             // SharedDrawingForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1011, 626);
+            this.Controls.Add(this.Label3);
+            this.Controls.Add(this.StartDrawing);
             this.Controls.Add(this.EraserSize);
             this.Controls.Add(this.PenSize);
             this.Controls.Add(this.btn_Clear);
@@ -280,5 +314,7 @@
         private System.Windows.Forms.Button btn_Clear;
         private System.Windows.Forms.ComboBox PenSize;
         private System.Windows.Forms.ComboBox EraserSize;
+        private System.Windows.Forms.Button StartDrawing;
+        private System.Windows.Forms.Label Label3;
     }
 }

@@ -33,7 +33,7 @@ namespace ProjectClient
         /// <summary>
         /// Pen used for drawing operations
         /// </summary>
-        private Pen drawingPen;
+        public Pen drawingPen;
         /// <summary>
         /// Pen used for erasing operations
         /// </summary>

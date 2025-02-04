@@ -70,6 +70,7 @@
     <Compile Include="DrawingAction.cs" />
     <Compile Include="DrawingManager.cs" />
     <Compile Include="EncryptionManager.cs" />
+    <Compile Include="FramePacket.cs" />
     <Compile Include="HomePage.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -112,6 +113,7 @@
     <Compile Include="TripleAuthentication.Designer.cs">
       <DependentUpon>TripleAuthentication.cs</DependentUpon>
     </Compile>
+    <Compile Include="UdpImageClient.cs" />
     <EmbeddedResource Include="ChangePasswordForm.resx">
       <DependentUpon>ChangePasswordForm.cs</DependentUpon>
     </EmbeddedResource>

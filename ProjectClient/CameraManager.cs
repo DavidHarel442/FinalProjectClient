@@ -19,13 +19,16 @@ namespace ProjectClient
         /// </summary>
         private PictureBox displayPictureBox;
 
+        private bool isCapturingFrames = false;
+        private UdpImageClient udpClient;
         /// <summary>
         /// Initializes a new instance of the CameraManager class.
         /// </summary>
         /// <param name="pictureBox">The PictureBox control where the camera feed will be displayed.</param>
-        public CameraManager(PictureBox pictureBox)
+        public CameraManager(PictureBox pictureBox, DrawingManager drawingManager)
         {
             displayPictureBox = pictureBox;
+            udpClient = new UdpImageClient("127.0.0.1", 5001, drawingManager);
         }
         /// <summary>
         /// Starts the camera and begins capturing video.
@@ -51,12 +54,20 @@ namespace ProjectClient
         private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             var mirroredFrame = MirrorImage((Bitmap)eventArgs.Frame.Clone());
+
             displayPictureBox.Invoke((MethodInvoker)delegate {
                 var oldImage = displayPictureBox.Image;
                 displayPictureBox.Image = mirroredFrame;
+
+                if (isCapturingFrames)
+                {
+                    _ = udpClient.SendFrameAsync((Bitmap)mirroredFrame.Clone());
+                }
+
                 oldImage?.Dispose();
             });
         }
+
         /// <summary>
         /// reates a mirrored (horizontally flipped) version of the provided image.
         /// </summary>
@@ -85,6 +96,17 @@ namespace ProjectClient
             }
             displayPictureBox.Image = null;
             displayPictureBox.Image?.Dispose();
+        }
+
+        public void StartFrameCapture()
+        {
+            isCapturingFrames = true;
+            udpClient.StartStreaming();
+        }
+        public void StopFrameCapture()
+        {
+            isCapturingFrames = false;
+            udpClient.StopStreaming();
         }
     }
 }

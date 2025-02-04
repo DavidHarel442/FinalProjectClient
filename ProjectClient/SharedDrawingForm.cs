@@ -35,8 +35,8 @@ namespace ProjectClient
                 this.tcpServer = tcpServer;
                 username.Text = username1;
                 MessageHandler.SetCurrentForm(this);
-                cameraManager = new CameraManager(Camera);
                 drawingManager = new DrawingManager(drawingPic);
+                cameraManager = new CameraManager(Camera,drawingManager);
                 drawingManager.DrawingActionPerformed += DrawingManager_DrawingActionPerformed;//This line sets up a connection (subscription) to listen for when drawing actions happens.
 
                 tcpServer.SendMessage("RequestFullDrawingState", "");
@@ -60,6 +60,8 @@ namespace ProjectClient
                     if (cameraManager.StartCamera())
                     {
                         ShowCamera.Text = "Stop Camera";
+                        Label3.Visible = true;
+                        StartDrawing.Visible = true;
                     }
                 }
                 else
@@ -257,7 +259,11 @@ namespace ProjectClient
         {
             drawingManager.SetDrawingMode(1);
         }
-
+        /// <summary>
+        /// event called when pressed on the fill button, changes drawing mode to fill
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void btn_fill_Click(object sender, EventArgs e)
         {
             drawingManager.SetDrawingMode(7);
@@ -325,6 +331,20 @@ namespace ProjectClient
         {
             base.OnFormClosing(e);
             cameraManager.StopCamera();
+        }
+
+        private void StartDrawing_Click(object sender, EventArgs e)
+        {
+            if (StartDrawing.Text == "Start Drawing")
+            {
+                cameraManager.StartFrameCapture();
+                StartDrawing.Text = "Stop Drawing";
+            }
+            else
+            {
+                cameraManager.StopFrameCapture();
+                StartDrawing.Text = "Start Drawing";
+            }
         }
     }
 }
