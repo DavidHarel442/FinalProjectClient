@@ -1,4 +1,6 @@
-﻿using System;
+﻿using AForge.Imaging;
+using ProjectClient.CameraAndRecognizing;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -9,11 +11,14 @@ namespace ProjectClient
 {
     public partial class SharedDrawingForm : Form
     {// this form is incharge of the Shared Drawing Board
+        public Point? calibrationPoint = null;
+        public DateTime calibrationTime = DateTime.MinValue;
+        private MarkerRecognizer markerRecognizer => cameraManager?.markerRecognizer;
 
         /// <summary>
         /// object incharge of communication with the server
         /// </summary>
-        private TcpServerCommunication tcpServer;
+        public TcpServerCommunication tcpServer;
         /// <summary>
         /// object incharge of managing the camera
         /// </summary>
@@ -22,6 +27,13 @@ namespace ProjectClient
         /// object incharge of managing the drawing
         /// </summary>
         public DrawingManager drawingManager;
+
+        // Add a boolean to track calibration mode
+        public bool isCalibrationMode = false;
+
+        private bool isMarkerDrawingEnabled = false;
+        private Point? lastMarkerPosition = null;
+
         /// <summary>
         /// constructor, inizialises form
         /// </summary>
@@ -36,7 +48,7 @@ namespace ProjectClient
                 username.Text = username1;
                 MessageHandler.SetCurrentForm(this);
                 drawingManager = new DrawingManager(drawingPic);
-                cameraManager = new CameraManager(Camera,drawingManager);
+                cameraManager = new CameraManager(Camera,drawingManager, this);
                 drawingManager.DrawingActionPerformed += DrawingManager_DrawingActionPerformed;//This line sets up a connection (subscription) to listen for when drawing actions happens.
 
                 tcpServer.SendMessage("RequestFullDrawingState", "");
@@ -59,15 +71,18 @@ namespace ProjectClient
                 {
                     if (cameraManager.StartCamera())
                     {
-                        ShowCamera.Text = "Stop Camera";
+                        ShowCamera.Text = "Dont Show Camera";
+                        Camera.Visible = true; // Make sure the camera is visible
                         Label3.Visible = true;
                         StartDrawing.Visible = true;
+                        btnCalibrateColor.Visible = true; // Show calibration button
                     }
                 }
                 else
                 {
-                    cameraManager.StopCamera();
-                    ShowCamera.Text = "Start Camera";
+                    Camera.Visible = false;
+                    ShowCamera.Text = "Start Camera"; // Reset button text
+                    cameraManager.StopCamera(); // Stop the camera when hiding
                 }
             }
             catch (Exception ex)
@@ -335,16 +350,198 @@ namespace ProjectClient
 
         private void StartDrawing_Click(object sender, EventArgs e)
         {
-            if (StartDrawing.Text == "Start Drawing")
+            try
             {
-                cameraManager.StartFrameCapture();
-                StartDrawing.Text = "Stop Drawing";
+                if (StartDrawing.Text == "Start Drawing")
+                {
+                    StartDrawing.Text = "Stop Drawing";
+                    isMarkerDrawingEnabled = true;
+                    lastMarkerPosition = null; // Reset the last position when starting a new drawing session
+
+                    // ADDED: Update marker recognizer with drawing status
+                    markerRecognizer.SetDrawingStatus(true);
+
+                    // Make sure the camera stays visible during drawing
+                    Camera.Visible = true;
+                }
+                else
+                {
+                    StartDrawing.Text = "Start Drawing";
+                    isMarkerDrawingEnabled = false;
+                    lastMarkerPosition = null; // Reset when stopping
+
+                    // ADDED: Update marker recognizer with drawing status
+                    markerRecognizer.SetDrawingStatus(false);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                cameraManager.StopFrameCapture();
-                StartDrawing.Text = "Start Drawing";
+                Console.WriteLine("Error in StartDrawing_Click: " + ex.Message);
+                MessageBox.Show(ex.ToString());
             }
         }
+
+        private void btnCalibrateColor_Click(object sender, EventArgs e)
+        {
+            // Enter calibration mode
+            isCalibrationMode = true;
+            calibrationPoint = null; // Reset any previous calibration point
+            btnCalibrateColor.Text = "Click on Marker";
+
+            // Show instructions in a non-blocking way
+            Label3.Text = "Click on your marker in the camera view";
+            Label3.ForeColor = Color.Yellow;
+        }
+
+        private void Camera_Click(object sender, EventArgs e)
+        {
+            if (isCalibrationMode)
+            {
+                try
+                {
+                    // Convert EventArgs to MouseEventArgs to get the click location
+                    if (e is MouseEventArgs mouseEvent)
+                    {
+                        // Debug
+                        Console.WriteLine($"Clicked {mouseEvent.X},{mouseEvent.Y}");
+
+                        if (Camera.Image == null) return;
+                        Bitmap bmp = (Bitmap)Camera.Image;
+                        Console.WriteLine($"Image size = {bmp.Width}x{bmp.Height}");
+
+                        // Are we within range?
+                        if (mouseEvent.X < 0 || mouseEvent.X >= bmp.Width ||
+                            mouseEvent.Y < 0 || mouseEvent.Y >= bmp.Height)
+                        {
+                            Console.WriteLine("Clicked out of bounds!");
+                            return;  // Don't calibrate if out-of-bounds
+                        }
+
+                        // Store calibration point for drawing
+                        calibrationPoint = new Point(mouseEvent.X, mouseEvent.Y);
+                        calibrationTime = DateTime.Now;
+
+                        // Try calibration
+                        cameraManager.CalibrateColorTracking(new System.Drawing.Point(mouseEvent.X, mouseEvent.Y));
+
+                        // Update UI to show calibration is done
+                        isCalibrationMode = false;
+                        btnCalibrateColor.Text = "Calibrate Marker Color";
+                        btnCalibrateColor.Visible = true;
+                        Label3.Text = "Camera View - Calibration successful!";
+                        Label3.ForeColor = Color.Lime;
+
+                        // After 3 seconds, revert the label
+                        System.Threading.Tasks.Task.Delay(3000).ContinueWith(t =>
+                        {
+                            this.BeginInvoke(new Action(() =>
+                            {
+                                Label3.Text = "Camera View";
+                                Label3.ForeColor = SystemColors.ControlText;
+                            }));
+                        });
+
+                        Console.WriteLine("Color calibration completed successfully");
+                    }
+                    else
+                    {
+                        // Exit calibration mode
+                        isCalibrationMode = false;
+                        btnCalibrateColor.Text = "Calibrate Marker Color";
+                        btnCalibrateColor.Visible = true;
+                        Label3.Text = "Camera View";
+                        Console.WriteLine("Calibration failed - not a mouse event");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log the exception
+                    Console.WriteLine($"Calibration error: {ex.Message}");
+                    Console.WriteLine(ex.StackTrace);
+
+                    // Exit calibration mode even on error
+                    isCalibrationMode = false;
+                    btnCalibrateColor.Text = "Calibrate Marker Color";
+                    btnCalibrateColor.Visible = true;
+                    Label3.Text = "Camera View - Calibration failed";
+                    Label3.ForeColor = Color.Red;
+                }
+            }
+           }
+        public void ProcessMarkerPosition(Point markerPosition, Size cameraSize)
+        {
+            if (!isMarkerDrawingEnabled)
+                return;
+
+            try
+            {
+                // Keep the camera visible during marker tracking
+                if (!Camera.Visible)
+                {
+                    Camera.Visible = true;
+                }
+
+                // Convert camera coordinates to drawing canvas coordinates
+                Point drawingCanvasPoint = TranslateCoordinates(markerPosition, cameraSize, drawingPic.Size);
+
+                // Log for debugging
+                if (DateTime.Now.Millisecond < 100) // Limit logging to reduce console spam
+                {
+                    Console.WriteLine($"Marker at camera({markerPosition.X},{markerPosition.Y}) -> drawing({drawingCanvasPoint.X},{drawingCanvasPoint.Y})");
+                }
+
+                // If we have a previous position, draw a line from it to the current position
+                if (lastMarkerPosition.HasValue)
+                {
+                    // Convert previous marker position to drawing coordinates
+                    Point prevDrawingPoint = TranslateCoordinates(lastMarkerPosition.Value, cameraSize, drawingPic.Size);
+
+                    // Use the existing drawing mechanism to draw a line
+                    DrawingAction action = drawingManager.Draw(drawingCanvasPoint, prevDrawingPoint);
+                    if (action != null)
+                    {
+                        // Send the drawing action to server (for multiplayer)
+                        tcpServer.SendMessage("DrawingAction", action.Serialize());
+                    }
+
+                    // Make sure the UI is updated
+                    if (drawingPic.InvokeRequired)
+                    {
+                        drawingPic.BeginInvoke(new Action(() => drawingPic.Invalidate()));
+                    }
+                    else
+                    {
+                        drawingPic.Invalidate();
+                    }
+                }
+
+                // Update the last known position
+                lastMarkerPosition = markerPosition;
+            }
+            catch (Exception ex)
+            {
+                // Just log the error, don't disrupt the drawing flow
+                Console.WriteLine($"Error processing marker position: {ex.Message}");
+            }
+        }
+        private Point TranslateCoordinates(Point source, Size sourceSize, Size targetSize)
+        {
+            // Calculate coordinates normally now that the camera view is already flipped
+            int x = (int)((float)source.X / sourceSize.Width * targetSize.Width);
+            int y = (int)((float)source.Y / sourceSize.Height * targetSize.Height);
+
+            // Ensure coordinates are within bounds
+            x = Math.Max(0, Math.Min(x, targetSize.Width - 1));
+            y = Math.Max(0, Math.Min(y, targetSize.Height - 1));
+
+            // Log occasionally for debugging
+            if (DateTime.Now.Millisecond < 50)
+            {
+                Console.WriteLine($"Translating: Camera({source.X},{source.Y}) -> Canvas({x},{y})");
+            }
+
+            return new Point(x, y);
+        }
+
     }
 }

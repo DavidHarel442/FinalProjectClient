@@ -37,7 +37,7 @@ namespace ProjectClient
         /// <summary>
         /// Pen used for erasing operations
         /// </summary>
-        private Pen eraser;
+        public Pen eraser;
         /// <summary>
         /// Current active tool mode (0: None, 1: Pencil, 2: Eraser, 7: Fill)
         /// </summary>

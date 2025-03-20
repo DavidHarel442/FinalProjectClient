@@ -33,11 +33,30 @@ namespace ProjectClient
         /// <param name="e"></param>
         private void OpenDrawingForm_Click(object sender, EventArgs e)
         {
+            try
+            {
+                // Create the SharedDrawingForm
                 SharedDrawingForm sharedDrawing = new SharedDrawingForm(tcpServer, username.Text);
-                tcpServer.SendMessage("OpenedDrawing", "");
+
+                // Send message to server
+                tcpServer.SendMessage("openedDrawing", "");
+
+                // Hide the current form
                 this.Hide();
-                sharedDrawing.ShowDialog();
-            
+
+                // Show the form as a non-modal window instead of ShowDialog
+                sharedDrawing.Show();
+
+                // Add a handler for when the form closes to show this form again
+                sharedDrawing.FormClosed += (s, args) => this.Show();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error opening drawing form: {ex.Message}");
+                MessageBox.Show($"Error opening shared drawing: {ex.Message}",
+                                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
         }
     }
 }

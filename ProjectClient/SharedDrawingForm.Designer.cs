@@ -42,6 +42,7 @@
             this.EraserSize = new System.Windows.Forms.ComboBox();
             this.StartDrawing = new System.Windows.Forms.Button();
             this.Label3 = new System.Windows.Forms.Label();
+            this.btnCalibrateColor = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.Camera)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.color_picker)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.drawingPic)).BeginInit();
@@ -55,7 +56,7 @@
             this.ShowCamera.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.ShowCamera.Font = new System.Drawing.Font("Nirmala UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ShowCamera.ForeColor = System.Drawing.SystemColors.Window;
-            this.ShowCamera.Location = new System.Drawing.Point(717, 218);
+            this.ShowCamera.Location = new System.Drawing.Point(680, 263);
             this.ShowCamera.Margin = new System.Windows.Forms.Padding(4);
             this.ShowCamera.Name = "ShowCamera";
             this.ShowCamera.Size = new System.Drawing.Size(282, 83);
@@ -69,7 +70,7 @@
             this.username.AutoSize = true;
             this.username.Font = new System.Drawing.Font("Nirmala UI", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.username.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(164)))), ((int)(((byte)(165)))), ((int)(((byte)(169)))));
-            this.username.Location = new System.Drawing.Point(931, 24);
+            this.username.Location = new System.Drawing.Point(894, 42);
             this.username.Name = "username";
             this.username.Size = new System.Drawing.Size(68, 17);
             this.username.TabIndex = 82;
@@ -78,7 +79,7 @@
             // pic_color
             // 
             this.pic_color.BackColor = System.Drawing.Color.Black;
-            this.pic_color.Location = new System.Drawing.Point(230, 37);
+            this.pic_color.Location = new System.Drawing.Point(230, 33);
             this.pic_color.Name = "pic_color";
             this.pic_color.Size = new System.Drawing.Size(65, 45);
             this.pic_color.TabIndex = 84;
@@ -94,7 +95,7 @@
             this.btn_pencil.ForeColor = System.Drawing.Color.Black;
             this.btn_pencil.Image = global::ProjectClient.Properties.Resources.rsz_2pencil12;
             this.btn_pencil.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
-            this.btn_pencil.Location = new System.Drawing.Point(463, 24);
+            this.btn_pencil.Location = new System.Drawing.Point(395, 20);
             this.btn_pencil.Name = "btn_pencil";
             this.btn_pencil.Size = new System.Drawing.Size(75, 58);
             this.btn_pencil.TabIndex = 87;
@@ -112,7 +113,7 @@
             this.btn_fill.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_fill.ForeColor = System.Drawing.Color.Black;
             this.btn_fill.Image = global::ProjectClient.Properties.Resources.bucket;
-            this.btn_fill.Location = new System.Drawing.Point(382, 24);
+            this.btn_fill.Location = new System.Drawing.Point(301, 20);
             this.btn_fill.Name = "btn_fill";
             this.btn_fill.Size = new System.Drawing.Size(75, 58);
             this.btn_fill.TabIndex = 86;
@@ -123,12 +124,13 @@
             // 
             // Camera
             // 
-            this.Camera.Location = new System.Drawing.Point(717, 73);
+            this.Camera.Location = new System.Drawing.Point(679, 118);
             this.Camera.Name = "Camera";
-            this.Camera.Size = new System.Drawing.Size(282, 138);
+            this.Camera.Size = new System.Drawing.Size(283, 138);
             this.Camera.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             this.Camera.TabIndex = 0;
             this.Camera.TabStop = false;
+            this.Camera.Click += new System.EventHandler(this.Camera_Click);
             // 
             // btn_eraser
             // 
@@ -139,7 +141,7 @@
             this.btn_eraser.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_eraser.ForeColor = System.Drawing.Color.Black;
             this.btn_eraser.Image = global::ProjectClient.Properties.Resources.eraser;
-            this.btn_eraser.Location = new System.Drawing.Point(544, 24);
+            this.btn_eraser.Location = new System.Drawing.Point(495, 20);
             this.btn_eraser.Name = "btn_eraser";
             this.btn_eraser.Size = new System.Drawing.Size(75, 58);
             this.btn_eraser.TabIndex = 88;
@@ -162,9 +164,9 @@
             // drawingPic
             // 
             this.drawingPic.BackColor = System.Drawing.Color.White;
-            this.drawingPic.Location = new System.Drawing.Point(5, 118);
+            this.drawingPic.Location = new System.Drawing.Point(-7, 118);
             this.drawingPic.Name = "drawingPic";
-            this.drawingPic.Size = new System.Drawing.Size(705, 496);
+            this.drawingPic.Size = new System.Drawing.Size(680, 680);
             this.drawingPic.TabIndex = 90;
             this.drawingPic.TabStop = false;
             this.drawingPic.MouseClick += new System.Windows.Forms.MouseEventHandler(this.drawingPic_MouseClick);
@@ -180,7 +182,7 @@
             this.btn_Clear.FlatAppearance.MouseOverBackColor = System.Drawing.Color.White;
             this.btn_Clear.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_Clear.ForeColor = System.Drawing.Color.Black;
-            this.btn_Clear.Location = new System.Drawing.Point(625, 24);
+            this.btn_Clear.Location = new System.Drawing.Point(587, 40);
             this.btn_Clear.Name = "btn_Clear";
             this.btn_Clear.Size = new System.Drawing.Size(86, 30);
             this.btn_Clear.TabIndex = 91;
@@ -207,7 +209,7 @@
             "16",
             "18",
             "20"});
-            this.PenSize.Location = new System.Drawing.Point(472, 88);
+            this.PenSize.Location = new System.Drawing.Point(404, 84);
             this.PenSize.Name = "PenSize";
             this.PenSize.Size = new System.Drawing.Size(57, 21);
             this.PenSize.TabIndex = 92;
@@ -233,7 +235,7 @@
             "16",
             "18",
             "20"});
-            this.EraserSize.Location = new System.Drawing.Point(553, 88);
+            this.EraserSize.Location = new System.Drawing.Point(504, 84);
             this.EraserSize.Name = "EraserSize";
             this.EraserSize.Size = new System.Drawing.Size(57, 21);
             this.EraserSize.TabIndex = 93;
@@ -248,7 +250,7 @@
             this.StartDrawing.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.StartDrawing.Font = new System.Drawing.Font("Nirmala UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.StartDrawing.ForeColor = System.Drawing.SystemColors.Window;
-            this.StartDrawing.Location = new System.Drawing.Point(746, 338);
+            this.StartDrawing.Location = new System.Drawing.Point(718, 383);
             this.StartDrawing.Margin = new System.Windows.Forms.Padding(4);
             this.StartDrawing.Name = "StartDrawing";
             this.StartDrawing.Size = new System.Drawing.Size(223, 64);
@@ -263,18 +265,29 @@
             this.Label3.AutoSize = true;
             this.Label3.Font = new System.Drawing.Font("Nirmala UI", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.Label3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(164)))), ((int)(((byte)(165)))), ((int)(((byte)(169)))));
-            this.Label3.Location = new System.Drawing.Point(749, 317);
+            this.Label3.Location = new System.Drawing.Point(715, 350);
             this.Label3.Name = "Label3";
             this.Label3.Size = new System.Drawing.Size(220, 17);
             this.Label3.TabIndex = 95;
             this.Label3.Text = "If You Want to Draw From Camera";
             this.Label3.Visible = false;
             // 
+            // btnCalibrateColor
+            // 
+            this.btnCalibrateColor.Location = new System.Drawing.Point(680, 20);
+            this.btnCalibrateColor.Name = "btnCalibrateColor";
+            this.btnCalibrateColor.Size = new System.Drawing.Size(173, 63);
+            this.btnCalibrateColor.TabIndex = 96;
+            this.btnCalibrateColor.Text = "btnCalibrateColor";
+            this.btnCalibrateColor.UseVisualStyleBackColor = true;
+            this.btnCalibrateColor.Click += new System.EventHandler(this.btnCalibrateColor_Click);
+            // 
             // SharedDrawingForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1011, 626);
+            this.ClientSize = new System.Drawing.Size(993, 818);
+            this.Controls.Add(this.btnCalibrateColor);
             this.Controls.Add(this.Label3);
             this.Controls.Add(this.StartDrawing);
             this.Controls.Add(this.EraserSize);
@@ -316,5 +329,6 @@
         private System.Windows.Forms.ComboBox EraserSize;
         private System.Windows.Forms.Button StartDrawing;
         private System.Windows.Forms.Label Label3;
+        private System.Windows.Forms.Button btnCalibrateColor;
     }
 }
