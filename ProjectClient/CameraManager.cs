@@ -95,8 +95,9 @@ namespace ProjectClient
                 // Create a copy for display
                 Bitmap displayFrame = ResizeImage(e.Frame, boxWidth, boxHeight);
 
-                // Process the frame for marker detection - MOVED OUTSIDE THE CONDITIONAL BLOCK
-                if (markerRecognizer != null)
+                // Only process the frame for marker detection if drawing is enabled
+                // This check prevents any recognition processing when not in drawing mode
+                if (markerRecognizer != null && parentForm != null && parentForm.isMarkerDrawingEnabled)
                 {
                     markerRecognizer.ProcessFrame(e.Frame, cameraPictureBox);
                 }
@@ -154,7 +155,7 @@ namespace ProjectClient
                     }
                 }
 
-                // Update the UI with the frame - MOVED OUTSIDE THE CONDITIONAL BLOCK
+                // Update the UI with the frame
                 Action updateUI = () =>
                 {
                     try

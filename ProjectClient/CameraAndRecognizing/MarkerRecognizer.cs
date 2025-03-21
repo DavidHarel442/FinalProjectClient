@@ -15,7 +15,7 @@ namespace ProjectClient.CameraAndRecognizing
     {
         // Marker detection strategies
         private ColorRecognizer colorRecognizer;
-        private ShapeRecognizer shapeRecognizer;
+        public ShapeRecognizer shapeRecognizer;
         private Queue<Point> recentPositions = new Queue<Point>(20); // Store recent positions for trail effect
         private bool drawingActive = false; // Set this based on the isMarkerDrawingEnabled flag
         private DateTime lastStatusUpdate = DateTime.MinValue;
@@ -25,7 +25,7 @@ namespace ProjectClient.CameraAndRecognizing
         public bool ShowDebugInfo = true; // Toggle debug visualization
         public bool ShowColorMask = true; // Show color detection mask
         public bool ShowShapeOutlines = true; // Show shape outlines
-
+        
         // Detection mode
         private enum DetectionMode
         {
@@ -257,17 +257,6 @@ namespace ProjectClient.CameraAndRecognizing
 
                         // Show status information
                         DrawStatusInformation(g, detectionSource, finalPosition);
-
-                        // Add debug overlay title
-                        if (ShowDebugInfo)
-                        {
-                            using (Font titleFont = new Font("Arial", 10, FontStyle.Bold))
-                            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(180, 0, 0, 0)))
-                            {
-                                g.FillRectangle(bgBrush, 10, 250, 350, 30);
-                                g.DrawString("SHAPE RECOGNITION DEBUG OVERLAY ACTIVE", titleFont, Brushes.Lime, 15, 255);
-                            }
-                        }
                     }
 
                     // Force the picture box to refresh
@@ -291,7 +280,7 @@ namespace ProjectClient.CameraAndRecognizing
                         float scaleY = (float)displayBox.Height / frame.Height;
 
                         // Draw debug visualizations even when no marker is detected
-                        if (ShowShapeOutlines && currentMode != DetectionMode.ColorOnly)
+                        if (ShowDebugInfo && currentMode != DetectionMode.ColorOnly)
                         {
                             shapeRecognizer.DrawDetectionVisuals(g, scaleX, scaleY);
                         }
@@ -305,8 +294,13 @@ namespace ProjectClient.CameraAndRecognizing
                     }
                     displayBox.Invalidate();
                 }
+
+                // IMPORTANT ADDITION: Send a "null" position to indicate marker is not detected
+                // This will signal the drawing system to stop drawing
+                OnMarkerDetected(new Point(0, 0), new Size(frame.Width, frame.Height));
             }
         }
+
         private void DrawMarkerIndicator(Graphics g, int x, int y, string source)
         {
             int size = 25; // Increased size for better visibility

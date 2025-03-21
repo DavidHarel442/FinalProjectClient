@@ -17,14 +17,19 @@ namespace ProjectClient.CameraAndRecognizing
     /// </summary>
     public class ShapeRecognizer
     {
+        private double baseAcceptanceThreshold = 0.5;
+        private double strictAcceptanceThreshold = 0.7;
+        private double currentAcceptanceThreshold = 0.5;
+        private DateTime? markerLostTime = null;
+        private TimeSpan thresholdIncreaseDelay = TimeSpan.FromSeconds(1);
         // Detection settings
         private bool isCalibrated = false;
         private Color targetColor;
         private int samplingStep = 2;
 
         // Shape detection parameters
-        private double minArea = 100;  // Minimum contour area to consider
-        private double maxArea = 5000; // Maximum contour area to consider
+        private double minArea = 500;  // Minimum contour area to consider
+        private double maxArea = 2000; // Maximum contour area to consider
         private double minCircularity = 0.5; // Minimum circularity for blob detection
 
         // Reference shape properties
@@ -37,7 +42,7 @@ namespace ProjectClient.CameraAndRecognizing
         private OpenCvPoint[] lastDetectedContour = null;
         private DrawingPoint lastDetectedCenter = new DrawingPoint(0, 0);
         private double lastMatchScore = 0;
-
+        
         /// <summary>
         /// Calibrates the detector with a marker's color and shape
         /// </summary>
@@ -320,6 +325,8 @@ namespace ProjectClient.CameraAndRecognizing
         /// <summary>
         /// Find a marker in the frame based on shape and color
         /// </summary>
+        // In the ShapeRecognizer class, update the FindMarker method:
+
         public DrawingPoint? FindMarker(Bitmap frame)
         {
             if (!isCalibrated || frame == null)
@@ -342,12 +349,9 @@ namespace ProjectClient.CameraAndRecognizing
                         int kernelSize = 5;
                         using (Mat kernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(kernelSize, kernelSize)))
                         {
-                            // Enhanced morphological processing for better shape detection
+                            // Simplified for performance
                             Cv2.MorphologyEx(colorMask, processedMask, MorphTypes.Open, kernel, iterations: 1);
-                            Cv2.MorphologyEx(processedMask, processedMask, MorphTypes.Close, kernel, iterations: 2);
-
-                            // Additional dilate operation to connect nearby components
-                            Cv2.Dilate(processedMask, processedMask, kernel, iterations: 1);
+                            Cv2.MorphologyEx(processedMask, processedMask, MorphTypes.Close, kernel, iterations: 1);
                         }
 
                         // Find contours
@@ -355,36 +359,86 @@ namespace ProjectClient.CameraAndRecognizing
                         HierarchyIndex[] hierarchyIndices;
                         Cv2.FindContours(processedMask, out contours, out hierarchyIndices, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
 
-                        // Debug output occasionally
-                        if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 50)
-                        {
-                            Console.WriteLine($"Found {contours.Length} contours in frame");
-                        }
-
-                        // No contours found
+                        // No contours found - apply adaptive threshold logic
                         if (contours.Length == 0)
                         {
+                            // If this is the first frame without markers, note the time
+                            if (!markerLostTime.HasValue)
+                            {
+                                markerLostTime = DateTime.Now;
+                            }
+                            else
+                            {
+                                // Check if we've exceeded the delay time for increasing threshold
+                                TimeSpan timeSinceLost = DateTime.Now - markerLostTime.Value;
+
+                                // Apply more aggressive threshold increase with stricter conditions
+                                if (timeSinceLost > thresholdIncreaseDelay && timeSinceLost.TotalSeconds < 2.5)
+                                {
+                                    // Increase threshold more rapidly
+                                    double timeRatio = Math.Min(1.0, (timeSinceLost.TotalSeconds - thresholdIncreaseDelay.TotalSeconds) / 1.0);
+                                    currentAcceptanceThreshold = baseAcceptanceThreshold +
+                                        (strictAcceptanceThreshold - baseAcceptanceThreshold) * timeRatio;
+
+                                    if (DateTime.Now.Millisecond < 50)
+                                    {
+                                        Console.WriteLine($"Detection threshold increased to {currentAcceptanceThreshold:F2} after {timeSinceLost.TotalSeconds:F1}s without marker");
+                                    }
+                                }
+                            }
+
                             lastDetectedContour = null;
                             lastMatchScore = 0;
                             return null;
                         }
+                        else
+                        {
+                            // Make the threshold reduction more gradual to maintain stricter conditions longer
+                            if (markerLostTime.HasValue)
+                            {
+                                // More gradual threshold reduction (0.03 instead of 0.05)
+                                double previousThreshold = currentAcceptanceThreshold;
+                                currentAcceptanceThreshold = Math.Max(
+                                    baseAcceptanceThreshold,
+                                    currentAcceptanceThreshold - 0.03);
 
-                        // Find best matching contour
+                                // Only log when threshold changes significantly and infrequently
+                                if (Math.Abs(previousThreshold - currentAcceptanceThreshold) > 0.01 &&
+                                    DateTime.Now.Second % 10 == 0 && DateTime.Now.Millisecond < 50)
+                                {
+                                    Console.WriteLine($"Detection threshold decreasing to {currentAcceptanceThreshold:F2}");
+                                }
+
+                                // Require more stability before fully restoring normal sensitivity
+                                if (Math.Abs(currentAcceptanceThreshold - baseAcceptanceThreshold) < 0.01)
+                                {
+                                    // Only log this once when resetting
+                                    if (markerLostTime.HasValue)
+                                    {
+                                        Console.WriteLine("Detection sensitivity restored to normal");
+                                    }
+                                    markerLostTime = null;
+                                    currentAcceptanceThreshold = baseAcceptanceThreshold;
+                                }
+                            }
+                        }
+
+                        // Find best matching contour with stricter area constraints
                         OpenCvPoint[] bestContour = null;
                         double bestScore = 0;
                         DrawingPoint bestCenter = new DrawingPoint(0, 0);
+
+                        // Set stricter area limits 
+                        double frameArea = cvFrame.Width * cvFrame.Height;
+                        double dynamicMinArea = Math.Max(minArea, frameArea * 0.002); // Increased from 0.001 to 0.002
+                        double dynamicMaxArea = Math.Min(maxArea, frameArea * 0.03);  // Decreased from 0.05 to 0.03
 
                         foreach (var contour in contours)
                         {
                             // Calculate area
                             double area = Cv2.ContourArea(contour);
 
-                            // Dynamic area thresholds based on frame size
-                            double frameArea = cvFrame.Width * cvFrame.Height;
-                            double dynamicMinArea = Math.Max(minArea, frameArea * 0.001); // At least 0.1% of frame
-                            double dynamicMaxArea = Math.Min(maxArea, frameArea * 0.2);   // At most 20% of frame
-
-                            // Skip contours outside the area range
+                            // Skip contours outside the stricter area range
                             if (area < dynamicMinArea || area > dynamicMaxArea)
                                 continue;
 
@@ -396,27 +450,58 @@ namespace ProjectClient.CameraAndRecognizing
                             int centerX = (int)(moments.M10 / moments.M00);
                             int centerY = (int)(moments.M01 / moments.M00);
 
-                            // Calculate match score based on shape similarity
+                            // Apply stricter shape matching criteria
                             double score = CalculateShapeMatchScore(contour);
 
-                            // Apply perimeter approximation to smooth contour for better visualization
-                            double perimeter = Cv2.ArcLength(contour, true);
-                            OpenCvPoint[] approxContour = Cv2.ApproxPolyDP(contour, 0.02 * perimeter, true);
+                            // Require higher base score before applying position proximity bonus
+                            if (score < 0.4)
+                            {
+                                continue; // Skip low-quality matches immediately
+                            }
 
-                            // If this contour scores better than our current best
+                            // Apply position proximity factor if we have a previous detection
+                            if (lastDetectedCenter.X != 0 && lastDetectedCenter.Y != 0)
+                            {
+                                // Calculate distance to last detected position - simplified calculation
+                                double dx = centerX - lastDetectedCenter.X;
+                                double dy = centerY - lastDetectedCenter.Y;
+                                double distance = Math.Sqrt(dx * dx + dy * dy);
+
+                                // Stricter maximum tracking distance
+                                double maxTrackingDistance = frame.Width * 0.2; // Reduced from 0.3 to 0.2
+
+                                // More weight on proximity for stability
+                                double proximityFactor = Math.Max(0.4, 1.0 - (distance / maxTrackingDistance));
+
+                                // Apply proximity boost to score
+                                score *= proximityFactor * 1.3;
+                            }
+
+                            // Only approximate contour if it's a potential best match
                             if (score > bestScore)
                             {
                                 bestScore = score;
-                                bestContour = approxContour; // Use the approximated contour for smoother display
+
+                                // Approximate contour for visualization
+                                if (score > currentAcceptanceThreshold * 0.8)
+                                {
+                                    double perimeter = Cv2.ArcLength(contour, true);
+                                    bestContour = Cv2.ApproxPolyDP(contour, 0.02 * perimeter, true);
+                                }
+                                else
+                                {
+                                    bestContour = contour;
+                                }
+
                                 bestCenter = new DrawingPoint(centerX, centerY);
                             }
                         }
 
-                        // Lower threshold for acceptance to show more potential matches
-                        double acceptanceThreshold = 0.5; // Reduced from 0.6 to show more potential matches
+                        // Use higher baseline acceptance threshold
+                        double baseThreshold = currentAcceptanceThreshold * 1.05; // 5% higher than adaptive threshold
 
                         // Return if we found a good match
-                        if (bestContour != null && bestScore > acceptanceThreshold)
+                        if (bestContour != null && bestScore > baseThreshold)
                         {
                             lastDetectedContour = bestContour;
                             lastDetectedCenter = bestCenter;
@@ -426,10 +511,14 @@ namespace ProjectClient.CameraAndRecognizing
                         else if (bestContour != null)
                         {
                             // Even if score is low, store it for debug visualization
-                            // but don't return it as a valid detection
                             lastDetectedContour = bestContour;
                             lastDetectedCenter = bestCenter;
                             lastMatchScore = bestScore;
+                        }
+                        else
+                        {
+                            lastDetectedContour = null;
+                            lastMatchScore = 0;
                         }
 
                         // No suitable match found
@@ -445,7 +534,23 @@ namespace ProjectClient.CameraAndRecognizing
                 return null;
             }
         }
+        public void ResetAdaptiveThreshold()
+        {
+            currentAcceptanceThreshold = baseAcceptanceThreshold;
+            markerLostTime = null;
+            Console.WriteLine("Detection thresholds reset to default values");
+        }
+        public void ConfigureAdaptiveThreshold(double baseThreshold, double strictThreshold, double delaySeconds)
+        {
+            baseAcceptanceThreshold = Math.Max(0.3, Math.Min(0.8, baseThreshold));
+            strictAcceptanceThreshold = Math.Max(baseAcceptanceThreshold + 0.1, strictThreshold);
+            thresholdIncreaseDelay = TimeSpan.FromSeconds(Math.Max(0.5, delaySeconds));
+            currentAcceptanceThreshold = baseAcceptanceThreshold;
+            markerLostTime = null;
 
+            Console.WriteLine($"Adaptive threshold configured: Base={baseAcceptanceThreshold:F2}, " +
+                             $"Strict={strictAcceptanceThreshold:F2}, Delay={thresholdIncreaseDelay.TotalSeconds:F1}s");
+        }
         /// <summary>
         /// Calculate how well a contour matches our reference shape
         /// </summary>
@@ -507,7 +612,7 @@ namespace ProjectClient.CameraAndRecognizing
             // Create a semi-transparent overlay for the debug info
             using (Brush overlayBrush = new SolidBrush(Color.FromArgb(30, 0, 0, 0)))
             {
-                g.FillRectangle(overlayBrush, 10, 120, 350, 120); // Background for debug info
+                g.FillRectangle(overlayBrush, 10, 120, 350, 140); // Background for debug info
             }
 
             // Display reference shape properties
@@ -526,6 +631,18 @@ namespace ProjectClient.CameraAndRecognizing
                 string colorInfo = $"Target: R:{targetColor.R}, G:{targetColor.G}, B:{targetColor.B}";
                 g.DrawString(colorInfo, new Font("Arial", 9), Brushes.White, 40, 145);
             }
+
+            // Add adaptive threshold information
+            string thresholdColor = currentAcceptanceThreshold > baseAcceptanceThreshold + 0.05 ?
+                "Red" : "Lime";
+            Brush thresholdBrush = thresholdColor == "Red" ? Brushes.Red : Brushes.Lime;
+
+            string thresholdInfo = $"Detection Threshold: {currentAcceptanceThreshold:F2}";
+            if (currentAcceptanceThreshold > baseAcceptanceThreshold + 0.05)
+            {
+                thresholdInfo += " (Strict Mode)";
+            }
+            g.DrawString(thresholdInfo, new Font("Arial", 9, FontStyle.Bold), thresholdBrush, 15, 225);
 
             // If we have a detected contour, show it and its properties
             if (lastDetectedContour != null && lastDetectedContour.Length > 0)
@@ -578,12 +695,15 @@ namespace ProjectClient.CameraAndRecognizing
                 string shapeDetails = $"Detected: {GetShapeTypeName(lastDetectedContour.Length)} | Vertices: {lastDetectedContour.Length}";
                 g.DrawString(shapeDetails, new Font("Arial", 9), Brushes.White, 15, 170);
 
-                string matchInfo = $"Match Score: {lastMatchScore:P0} | Position: ({centerX}, {centerY})";
-                g.DrawString(matchInfo, new Font("Arial", 9), Brushes.White, 15, 190);
+                string matchInfo = $"Match Score: {lastMatchScore:F2} | Required: {currentAcceptanceThreshold:F2}";
+
+                // Color the match info based on whether it passes current threshold
+                Brush matchBrush = lastMatchScore >= currentAcceptanceThreshold ? Brushes.Lime : Brushes.Yellow;
+                g.DrawString(matchInfo, new Font("Arial", 9), matchBrush, 15, 190);
 
                 // Add help text
                 string helpText = "Debug Overlay: Shape Recognition Visualization";
-                g.DrawString(helpText, new Font("Arial", 9, FontStyle.Italic), Brushes.LightGray, 15, 210);
+                g.DrawString(helpText, new Font("Arial", 9, FontStyle.Italic), Brushes.LightGray, 15, 245);
             }
             else
             {
@@ -591,8 +711,14 @@ namespace ProjectClient.CameraAndRecognizing
                 string noDetectionMsg = "No shape detected. Try adjusting lighting or marker position.";
                 g.DrawString(noDetectionMsg, new Font("Arial", 9), Brushes.Red, 15, 170);
 
+                // Show active threshold info
+                string strictnessMsg = currentAcceptanceThreshold > baseAcceptanceThreshold + 0.05 ?
+                    "Detection mode: STRICT (harder to detect)" :
+                    "Detection mode: NORMAL";
+                g.DrawString(strictnessMsg, new Font("Arial", 9), thresholdBrush, 15, 190);
+
                 string helpText = "Debug Overlay: Waiting for shape detection...";
-                g.DrawString(helpText, new Font("Arial", 9, FontStyle.Italic), Brushes.LightGray, 15, 190);
+                g.DrawString(helpText, new Font("Arial", 9, FontStyle.Italic), Brushes.LightGray, 15, 245);
             }
         }
 

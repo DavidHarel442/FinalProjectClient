@@ -13,8 +13,9 @@ namespace ProjectClient
     {// this form is incharge of the Shared Drawing Board
         public Point? calibrationPoint = null;
         public DateTime calibrationTime = DateTime.MinValue;
-        private MarkerRecognizer markerRecognizer => cameraManager?.markerRecognizer;
-
+        public MarkerRecognizer markerRecognizer => cameraManager?.markerRecognizer;
+        private DateTime? markerLostStartTime = null;
+        private int markerLostTimeoutSeconds = 3; // Auto-stop drawing after 3 seconds of marker loss
         /// <summary>
         /// object incharge of communication with the server
         /// </summary>
@@ -31,7 +32,7 @@ namespace ProjectClient
         // Add a boolean to track calibration mode
         public bool isCalibrationMode = false;
 
-        private bool isMarkerDrawingEnabled = false;
+        public bool isMarkerDrawingEnabled = false;
         private Point? lastMarkerPosition = null;
 
         /// <summary>
@@ -50,7 +51,9 @@ namespace ProjectClient
                 drawingManager = new DrawingManager(drawingPic);
                 cameraManager = new CameraManager(Camera,drawingManager, this);
                 drawingManager.DrawingActionPerformed += DrawingManager_DrawingActionPerformed;//This line sets up a connection (subscription) to listen for when drawing actions happens.
-
+                ToolTip toolTip = new ToolTip();
+                toolTip.SetToolTip(StartDrawing, "Drawing will auto-stop if marker is lost for " +
+                                                 markerLostTimeoutSeconds + " seconds");
                 tcpServer.SendMessage("RequestFullDrawingState", "");
             }
             catch (Exception ex)
@@ -58,6 +61,7 @@ namespace ProjectClient
                 MessageBox.Show($"Error initializing SharedDrawingForm: {ex.Message}");
             }
         }
+
         /// <summary>
         /// event called when pressing on the ShowCamera button, it starts/stops the camera depends on current state.
         /// </summary>
@@ -71,6 +75,15 @@ namespace ProjectClient
                 {
                     if (cameraManager.StartCamera())
                     {
+                        cameraManager.SetQualitySettings(
+                                        width: 960,          // Middle ground resolution
+                                        height: 540,         // Middle ground resolution
+                                        skipFrames: false,   // Or true if still laggy
+                                        samplingStep: 2,     // Increase step to reduce processing load
+                                        smoothing: true,
+                                        smoothStrength: 0.5,
+                                        minMoveThreshold: 2
+                                    );
                         ShowCamera.Text = "Dont Show Camera";
                         Camera.Visible = true; // Make sure the camera is visible
                         Label3.Visible = true;
@@ -358,20 +371,31 @@ namespace ProjectClient
                     isMarkerDrawingEnabled = true;
                     lastMarkerPosition = null; // Reset the last position when starting a new drawing session
 
-                    // ADDED: Update marker recognizer with drawing status
-                    markerRecognizer.SetDrawingStatus(true);
+                    // Update the marker recognizer drawing status
+                    if (markerRecognizer != null)
+                    {
+                        markerRecognizer.SetDrawingStatus(true);
+                    }
 
                     // Make sure the camera stays visible during drawing
                     Camera.Visible = true;
+
+                    Console.WriteLine("Drawing mode started");
                 }
                 else
                 {
                     StartDrawing.Text = "Start Drawing";
                     isMarkerDrawingEnabled = false;
                     lastMarkerPosition = null; // Reset when stopping
+                    markerLostStartTime = null; // Reset the lost timer
 
-                    // ADDED: Update marker recognizer with drawing status
-                    markerRecognizer.SetDrawingStatus(false);
+                    // Update the marker recognizer drawing status  
+                    if (markerRecognizer != null)
+                    {
+                        markerRecognizer.SetDrawingStatus(false);
+                    }
+
+                    Console.WriteLine("Drawing mode stopped");
                 }
             }
             catch (Exception ex)
@@ -470,6 +494,7 @@ namespace ProjectClient
            }
         public void ProcessMarkerPosition(Point markerPosition, Size cameraSize)
         {
+            // If drawing is disabled, don't process anything
             if (!isMarkerDrawingEnabled)
                 return;
 
@@ -481,11 +506,70 @@ namespace ProjectClient
                     Camera.Visible = true;
                 }
 
+                // Check if marker was not found (received null position)
+                if (markerPosition.X == 0 && markerPosition.Y == 0)
+                {
+                    // If this is the first time we're losing the marker, start tracking the time
+                    if (!markerLostStartTime.HasValue)
+                    {
+                        markerLostStartTime = DateTime.Now;
+                        Console.WriteLine("Marker lost - drawing paused. Will auto-stop if not found soon.");
+                    }
+                    else
+                    {
+                        // Check if we've exceeded the timeout for marker loss
+                        TimeSpan lostTime = DateTime.Now - markerLostStartTime.Value;
+                        if (lostTime.TotalSeconds >= markerLostTimeoutSeconds)
+                        {
+                            // Auto-stop drawing mode since marker has been lost for too long
+                            if (isMarkerDrawingEnabled)
+                            {
+                                Console.WriteLine($"Marker lost for {lostTime.TotalSeconds:F1} seconds - auto-stopping drawing mode");
+
+                                // Use Invoke to ensure we're on the UI thread
+                                this.BeginInvoke(new Action(() => {
+                                    // Simulate clicking the StartDrawing button to stop drawing
+                                    StartDrawing_Click(StartDrawing, EventArgs.Empty);
+
+                                    // Show a brief notification
+                                    Label3.Text = "Drawing auto-stopped - marker lost";
+                                    Label3.ForeColor = Color.Orange;
+
+                                    // Reset the label after a few seconds
+                                    System.Threading.Tasks.Task.Delay(3000).ContinueWith(t => {
+                                        this.BeginInvoke(new Action(() => {
+                                            Label3.Text = "Camera View";
+                                            Label3.ForeColor = SystemColors.ControlText;
+                                        }));
+                                    });
+                                }));
+                            }
+
+                            // Reset the timer to prevent repeated triggering
+                            markerLostStartTime = null;
+                        }
+                        else if (lostTime.TotalSeconds >= 1.0 && DateTime.Now.Second % 2 == 0 && DateTime.Now.Millisecond < 100)
+                        {
+                            // Periodically log how long we've been waiting (reduced frequency)
+                            Console.WriteLine($"Marker still lost for {lostTime.TotalSeconds:F1} seconds");
+                        }
+                    }
+
+                    // Reset last position to prevent drawing when marker reappears
+                    lastMarkerPosition = null;
+                    return;
+                }
+                else
+                {
+                    // Marker found - reset the lost timer
+                    markerLostStartTime = null;
+                }
+
                 // Convert camera coordinates to drawing canvas coordinates
                 Point drawingCanvasPoint = TranslateCoordinates(markerPosition, cameraSize, drawingPic.Size);
 
-                // Log for debugging
-                if (DateTime.Now.Millisecond < 100) // Limit logging to reduce console spam
+                // Reduced logging frequency
+                if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 50) // Log only every 5 seconds 
                 {
                     Console.WriteLine($"Marker at camera({markerPosition.X},{markerPosition.Y}) -> drawing({drawingCanvasPoint.X},{drawingCanvasPoint.Y})");
                 }
@@ -496,22 +580,36 @@ namespace ProjectClient
                     // Convert previous marker position to drawing coordinates
                     Point prevDrawingPoint = TranslateCoordinates(lastMarkerPosition.Value, cameraSize, drawingPic.Size);
 
-                    // Use the existing drawing mechanism to draw a line
-                    DrawingAction action = drawingManager.Draw(drawingCanvasPoint, prevDrawingPoint);
-                    if (action != null)
-                    {
-                        // Send the drawing action to server (for multiplayer)
-                        tcpServer.SendMessage("DrawingAction", action.Serialize());
-                    }
+                    // Calculate distance between consecutive points
+                    double distance = Math.Sqrt(
+                        Math.Pow(prevDrawingPoint.X - drawingCanvasPoint.X, 2) +
+                        Math.Pow(prevDrawingPoint.Y - drawingCanvasPoint.Y, 2));
 
-                    // Make sure the UI is updated
-                    if (drawingPic.InvokeRequired)
+                    // Only draw if the distance is reasonable (prevents erratic jumps from causing lines)
+                    if (distance < drawingPic.Width * 0.3) // Maximum 30% of canvas width for a single stroke
                     {
-                        drawingPic.BeginInvoke(new Action(() => drawingPic.Invalidate()));
+                        // Use the existing drawing mechanism to draw a line
+                        DrawingAction action = drawingManager.Draw(drawingCanvasPoint, prevDrawingPoint);
+                        if (action != null)
+                        {
+                            // Send the drawing action to server (for multiplayer)
+                            tcpServer.SendMessage("DrawingAction", action.Serialize());
+                        }
+
+                        // Make sure the UI is updated
+                        if (drawingPic.InvokeRequired)
+                        {
+                            drawingPic.BeginInvoke(new Action(() => drawingPic.Invalidate()));
+                        }
+                        else
+                        {
+                            drawingPic.Invalidate();
+                        }
                     }
-                    else
+                    else if (distance > drawingPic.Width * 0.1 && DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 50)
                     {
-                        drawingPic.Invalidate();
+                        // For medium jumps, update position but don't draw (reduced logging)
+                        Console.WriteLine($"Large movement detected ({distance:F1} px) - skipping draw");
                     }
                 }
 

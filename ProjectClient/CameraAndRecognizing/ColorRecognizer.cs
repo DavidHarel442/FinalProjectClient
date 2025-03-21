@@ -16,7 +16,7 @@ namespace ProjectClient.CameraAndRecognizing
     public class ColorRecognizer
     {
         // Color detection settings
-        private const int DEFAULT_COLOR_THRESHOLD = 80;
+        private const int DEFAULT_COLOR_THRESHOLD = 50;
         private int colorThreshold = DEFAULT_COLOR_THRESHOLD;
         private int samplingStep = 2;
 
