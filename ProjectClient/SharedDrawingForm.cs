@@ -375,12 +375,21 @@ namespace ProjectClient
                     if (markerRecognizer != null)
                     {
                         markerRecognizer.SetDrawingStatus(true);
+
+                        // Reset adaptive thresholds when starting drawing
+                        if (markerRecognizer.shapeRecognizer != null)
+                        {
+                            markerRecognizer.shapeRecognizer.ResetAdaptiveThreshold();
+                        }
+
+                        // Reset position history to prevent awkward lines when drawing resumes
+                        markerRecognizer.ResetPositionHistory();
                     }
 
                     // Make sure the camera stays visible during drawing
                     Camera.Visible = true;
 
-                    Console.WriteLine("Drawing mode started");
+                    Console.WriteLine("Drawing mode started - position history reset");
                 }
                 else
                 {
@@ -393,6 +402,15 @@ namespace ProjectClient
                     if (markerRecognizer != null)
                     {
                         markerRecognizer.SetDrawingStatus(false);
+
+                        // Reset adaptive thresholds when stopping drawing
+                        if (markerRecognizer.shapeRecognizer != null)
+                        {
+                            markerRecognizer.shapeRecognizer.ResetAdaptiveThreshold();
+                        }
+
+                        // Reset position history when stopping drawing
+                        markerRecognizer.ResetPositionHistory();
                     }
 
                     Console.WriteLine("Drawing mode stopped");
@@ -585,8 +603,12 @@ namespace ProjectClient
                         Math.Pow(prevDrawingPoint.X - drawingCanvasPoint.X, 2) +
                         Math.Pow(prevDrawingPoint.Y - drawingCanvasPoint.Y, 2));
 
+                    // IMPORTANT: Check if this is potentially the first detection after a pause
+                    // If the distance is unusually large, don't draw a line
+                    bool isFirstAfterReset = distance > drawingPic.Width * 0.15; // 15% of canvas width threshold
+
                     // Only draw if the distance is reasonable (prevents erratic jumps from causing lines)
-                    if (distance < drawingPic.Width * 0.3) // Maximum 30% of canvas width for a single stroke
+                    if (distance < drawingPic.Width * 0.3 && !isFirstAfterReset) // Maximum 30% of canvas width for a single stroke
                     {
                         // Use the existing drawing mechanism to draw a line
                         DrawingAction action = drawingManager.Draw(drawingCanvasPoint, prevDrawingPoint);
@@ -605,6 +627,11 @@ namespace ProjectClient
                         {
                             drawingPic.Invalidate();
                         }
+                    }
+                    else if (isFirstAfterReset)
+                    {
+                        // Log that we're skipping the first line after reset
+                        Console.WriteLine($"First marker detection after reset - skipping initial line ({distance:F1} px)");
                     }
                     else if (distance > drawingPic.Width * 0.1 && DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 50)
                     {

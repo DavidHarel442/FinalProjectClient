@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using DrawingPoint = System.Drawing.Point;
 
 namespace ProjectClient.CameraAndRecognizing
 {
@@ -20,7 +21,10 @@ namespace ProjectClient.CameraAndRecognizing
         private bool drawingActive = false; // Set this based on the isMarkerDrawingEnabled flag
         private DateTime lastStatusUpdate = DateTime.MinValue;
         private string statusMessage = "Ready";
-
+        private DateTime? markerLostTime = null;
+        private DrawingPoint lastValidPosition = new DrawingPoint(0, 0);
+        private int consecutiveNoDetectionFrames = 0;
+        private double maxDistanceFactorWhenLost = 0.15; // Max distance as fraction of frame diagonal
         // DEBUG: Enhanced visualization options
         public bool ShowDebugInfo = true; // Toggle debug visualization
         public bool ShowColorMask = true; // Show color detection mask
@@ -114,7 +118,51 @@ namespace ProjectClient.CameraAndRecognizing
                     break;
             }
         }
+        public void ResetPositionHistory()
+        {
+            // Clear the recent positions queue
+            recentPositions.Clear();
 
+            // Reset the last position used for smoothing
+            firstPos = true;
+            lastPos = new PointF(0, 0);
+
+            // Clear the last detected center
+            shapeRecognizer.lastDetectedCenter = new Point(0, 0);
+        }
+        public void SetAdaptiveDetection(bool enable)
+        {
+            if (enable)
+            {
+                // Configure shape recognizer for tiered adaptive detection
+                // Parameters: baseThreshold, mediumThreshold, strictThreshold, colorDelaySeconds, shapeDelaySeconds
+                //   - Base threshold: Normal operation
+                //   - Medium threshold: After 1 second (color strictness trigger)
+                //   - Strict threshold: After 1.5 seconds (shape strictness trigger)
+                shapeRecognizer.ConfigureAdaptiveThreshold(0.5, 0.65, 0.8, 1.0, 1.5);
+                shapeRecognizer.EnableAdaptiveColorRange(true);
+
+                // Configure color recognizer for adaptive thresholds
+                // Parameters: baseThreshold, strictThreshold
+                colorRecognizer.ConfigureAdaptiveThreshold(50, 30);
+
+                Console.WriteLine("Tiered adaptive detection enabled with the following stages:");
+                Console.WriteLine("  - Stage 1 (at 1.0s): Stricter with color and location");
+                Console.WriteLine("  - Stage 2 (at 1.5s): Stricter with shape detection");
+                Console.WriteLine("  - Reset: Gradual return to normal thresholds after marker is found");
+            }
+            else
+            {
+                // Reset all adaptive behavior
+                shapeRecognizer.ResetAdaptiveThreshold();
+                shapeRecognizer.EnableAdaptiveColorRange(false);
+                colorRecognizer.ConfigureAdaptiveThreshold(50, 50);
+                consecutiveNoDetectionFrames = 0;
+                markerLostTime = null;
+
+                Console.WriteLine("Adaptive detection disabled - using fixed thresholds");
+            }
+        }
         /// <summary>
         /// Calibrate color tracking based on a point in the image
         /// </summary>
@@ -141,6 +189,9 @@ namespace ProjectClient.CameraAndRecognizing
         /// <summary>
         /// Process a frame to detect markers
         /// </summary>
+        /// <summary>
+        /// Process a frame to detect markers
+        /// </summary>
         public void ProcessFrame(Bitmap frame, PictureBox displayBox)
         {
             if (!isCalibrated || frame == null)
@@ -153,6 +204,8 @@ namespace ProjectClient.CameraAndRecognizing
             // Detect based on current mode
             if (currentMode == DetectionMode.ColorOnly || currentMode == DetectionMode.Combined)
             {
+                // Update color threshold based on marker status
+                colorRecognizer.UpdateColorThreshold(markerLostTime.HasValue, markerLostTime);
                 colorMarker = colorRecognizer.FindMarker(frame, targetColor, samplingStep);
             }
 
@@ -165,6 +218,21 @@ namespace ProjectClient.CameraAndRecognizing
             Point? markerCenter = null;
             string detectionSource = "";
 
+            // Calculate maximum allowed distance between detections
+            double frameDiagonal = Math.Sqrt(frame.Width * frame.Width + frame.Height * frame.Height);
+            double maxAllowedDistance = frameDiagonal * maxDistanceFactorWhenLost;
+
+            // If marker has been lost for a while, make distance constraint stricter
+            if (markerLostTime.HasValue)
+            {
+                TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
+                if (lostDuration.TotalSeconds > 1.0)
+                {
+                    // Make distance constraint stricter as lost time increases
+                    maxAllowedDistance *= Math.Max(0.5, 1.0 - (lostDuration.TotalSeconds - 1.0) / 5.0);
+                }
+            }
+
             if (currentMode == DetectionMode.Combined)
             {
                 // If both strategies find a marker, check if they're close to each other
@@ -174,7 +242,10 @@ namespace ProjectClient.CameraAndRecognizing
                         Math.Pow(colorMarker.Value.X - shapeMarker.Value.X, 2) +
                         Math.Pow(colorMarker.Value.Y - shapeMarker.Value.Y, 2));
 
-                    if (distance < 50) // Markers are close, we've found the target
+                    // Use stricter proximity requirement when marker has been lost
+                    double proximityThreshold = markerLostTime.HasValue ? 30 : 50;
+
+                    if (distance < proximityThreshold) // Markers are close, we've found the target
                     {
                         // Prefer shape for center position
                         markerCenter = shapeMarker;
@@ -182,124 +253,234 @@ namespace ProjectClient.CameraAndRecognizing
                     }
                     else
                     {
-                        // Markers are far apart - prefer shape detection
-                        markerCenter = shapeMarker;
-                        detectionSource = "Shape";
+                        // Markers are far apart - check which one is closer to last position
+                        if (lastValidPosition.X != 0 && lastValidPosition.Y != 0)
+                        {
+                            double distToColor = colorMarker.Value.DistanceTo(lastValidPosition);
+                            double distToShape = shapeMarker.Value.DistanceTo(lastValidPosition);
+
+                            // If either is too far from last position when lost, reject it
+                            if (markerLostTime.HasValue &&
+                                Math.Min(distToColor, distToShape) > maxAllowedDistance)
+                            {
+                                // Neither is close enough to last position
+                                markerCenter = null;
+                                detectionSource = "Rejected (too far)";
+                            }
+                            else if (distToShape < distToColor)
+                            {
+                                // Shape is closer to last position
+                                markerCenter = shapeMarker;
+                                detectionSource = "Shape";
+                            }
+                            else
+                            {
+                                // Color is closer to last position
+                                markerCenter = colorMarker;
+                                detectionSource = "Color";
+                            }
+                        }
+                        else
+                        {
+                            // No last position, prefer shape
+                            markerCenter = shapeMarker;
+                            detectionSource = "Shape";
+                        }
                     }
                 }
                 else if (shapeMarker.HasValue)
                 {
-                    // Only shape detection succeeded
-                    markerCenter = shapeMarker;
-                    detectionSource = "Shape";
+                    // Only shape detection succeeded - check distance from last position
+                    if (markerLostTime.HasValue && lastValidPosition.X != 0 && lastValidPosition.Y != 0)
+                    {
+                        double distance = shapeMarker.Value.DistanceTo(lastValidPosition);
+                        if (distance > maxAllowedDistance)
+                        {
+                            // Too far from last position, reject
+                            markerCenter = null;
+                            detectionSource = "Shape rejected (too far)";
+                        }
+                        else
+                        {
+                            markerCenter = shapeMarker;
+                            detectionSource = "Shape";
+                        }
+                    }
+                    else
+                    {
+                        markerCenter = shapeMarker;
+                        detectionSource = "Shape";
+                    }
                 }
                 else if (colorMarker.HasValue)
                 {
-                    // Only color detection succeeded
-                    markerCenter = colorMarker;
-                    detectionSource = "Color";
+                    // Only color detection succeeded - check distance from last position
+                    if (markerLostTime.HasValue && lastValidPosition.X != 0 && lastValidPosition.Y != 0)
+                    {
+                        double distance = colorMarker.Value.DistanceTo(lastValidPosition);
+                        if (distance > maxAllowedDistance)
+                        {
+                            // Too far from last position, reject
+                            markerCenter = null;
+                            detectionSource = "Color rejected (too far)";
+                        }
+                        else
+                        {
+                            markerCenter = colorMarker;
+                            detectionSource = "Color";
+                        }
+                    }
+                    else
+                    {
+                        markerCenter = colorMarker;
+                        detectionSource = "Color";
+                    }
                 }
             }
             else if (currentMode == DetectionMode.ShapeOnly)
             {
                 markerCenter = shapeMarker;
                 detectionSource = "Shape";
+
+                // Additional distance check when marker was previously lost
+                if (markerCenter.HasValue && markerLostTime.HasValue &&
+                    lastValidPosition.X != 0 && lastValidPosition.Y != 0)
+                {
+                    double distance = markerCenter.Value.DistanceTo(lastValidPosition);
+                    if (distance > maxAllowedDistance)
+                    {
+                        markerCenter = null;
+                        detectionSource = "Shape rejected (too far)";
+                    }
+                }
             }
             else // ColorOnly
             {
                 markerCenter = colorMarker;
                 detectionSource = "Color";
+
+                // Additional distance check when marker was previously lost
+                if (markerCenter.HasValue && markerLostTime.HasValue &&
+                    lastValidPosition.X != 0 && lastValidPosition.Y != 0)
+                {
+                    double distance = markerCenter.Value.DistanceTo(lastValidPosition);
+                    if (distance > maxAllowedDistance)
+                    {
+                        markerCenter = null;
+                        detectionSource = "Color rejected (too far)";
+                    }
+                }
             }
 
             if (markerCenter.HasValue)
             {
-                // Update our position history for the trail effect
-                recentPositions.Enqueue(markerCenter.Value);
-                if (recentPositions.Count > 20) // Limit the trail length
-                    recentPositions.Dequeue();
-
-                // Apply position smoothing if enabled
-                Point finalPosition = markerCenter.Value;
-                if (useSmoothing)
+                // Reset marker lost tracking
+                if (markerLostTime.HasValue)
                 {
-                    finalPosition = SmoothPosition(finalPosition);
+                    TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
+                    if (lostDuration.TotalSeconds > 1.0)
+                    {
+                        Console.WriteLine($"Marker found after {lostDuration.TotalSeconds:F1}s");
+                    }
+                    markerLostTime = null;
                 }
 
-                // If display box is provided, draw marker indicators
+                consecutiveNoDetectionFrames = 0;
+
+                // Update last valid position for future reference
+                lastValidPosition = markerCenter.Value;
+
+                // Apply smoothing if enabled
+                Point finalPosition = useSmoothing ? SmoothPosition(markerCenter.Value) : markerCenter.Value;
+
+                // Add to recent positions for drawing trail
+                if (recentPositions.Count >= 20)
+                    recentPositions.Dequeue();
+                recentPositions.Enqueue(finalPosition);
+
+                // Create visualization
                 if (displayBox != null && displayBox.Image != null)
                 {
+                    float scaleX = (float)displayBox.Width / frame.Width;
+                    float scaleY = (float)displayBox.Height / frame.Height;
+
                     using (Graphics g = Graphics.FromImage(displayBox.Image))
                     {
-                        float scaleX = (float)displayBox.Width / frame.Width;
-                        float scaleY = (float)displayBox.Height / frame.Height;
-
-                        int scaledX = (int)(finalPosition.X * scaleX);
-                        int scaledY = (int)(finalPosition.Y * scaleY);
-
-                        // Always draw shape detection visuals when in debug mode (ShowDebugInfo)
-                        // This will show shapes even when they don't meet the detection threshold
-                        if (ShowDebugInfo && currentMode != DetectionMode.ColorOnly)
-                        {
-                            shapeRecognizer.DrawDetectionVisuals(g, scaleX, scaleY);
-                        }
-
-                        // Let color recognizer draw its visualization if used
-                        if (ShowColorMask && (currentMode != DetectionMode.ShapeOnly))
-                        {
-                            colorRecognizer.DrawDetectionVisuals(g, frame, targetColor, scaleX, scaleY);
-                        }
-
-                        // Draw the trail effect (recent marker positions)
+                        // Draw trail if needed
                         DrawPositionTrail(g, scaleX, scaleY);
 
-                        // Draw a more visible target indicator 
-                        DrawMarkerIndicator(g, scaledX, scaledY, detectionSource);
+                        // Draw marker indicator at current position
+                        DrawMarkerIndicator(g, (int)(finalPosition.X * scaleX), (int)(finalPosition.Y * scaleY), detectionSource);
 
-                        // Show status information
+                        // Draw status information
                         DrawStatusInformation(g, detectionSource, finalPosition);
-                    }
 
-                    // Force the picture box to refresh
-                    displayBox.Invalidate();
+                        // Add debug visualizations if enabled
+                        if (ShowDebugInfo)
+                        {
+                            // Draw color detector debug visuals
+                            colorRecognizer.DrawDetectionVisuals(g, frame, targetColor, scaleX, scaleY);
+
+                            // Draw shape detector debug visuals
+                            shapeRecognizer.DrawDetectionVisuals(g, scaleX, scaleY);
+                        }
+                    }
                 }
 
-                // Raise the marker detected event
+                // Trigger marker detected event
                 OnMarkerDetected(finalPosition, new Size(frame.Width, frame.Height));
             }
             else
             {
-                // Clear the trail if no marker is detected
-                recentPositions.Clear();
+                // Track consecutive frames with no detection
+                consecutiveNoDetectionFrames++;
 
-                // Still draw status even if no marker is detected
-                if (displayBox != null && displayBox.Image != null)
+                // Set the marker lost time if not already set
+                if (!markerLostTime.HasValue && consecutiveNoDetectionFrames >= 3)
+                {
+                    markerLostTime = DateTime.Now;
+                    Console.WriteLine("Marker lost, entering adaptive detection mode");
+                }
+
+                // Clear the trail if no marker is detected for several frames
+                if (consecutiveNoDetectionFrames > 10)
+                {
+                    recentPositions.Clear();
+                }
+
+                // Send a notification that no marker was detected (critical for stopping drawing)
+                if (consecutiveNoDetectionFrames >= 3)
+                {
+                    // Send a sentinel value (0,0) to indicate marker is lost
+                    OnMarkerDetected(new Point(0, 0), new Size(frame.Width, frame.Height));
+                }
+
+                // Draw adaptive status information
+                if (displayBox != null && displayBox.Image != null && markerLostTime.HasValue)
                 {
                     using (Graphics g = Graphics.FromImage(displayBox.Image))
                     {
-                        float scaleX = (float)displayBox.Width / frame.Width;
-                        float scaleY = (float)displayBox.Height / frame.Height;
+                        TimeSpan lostTime = DateTime.Now - markerLostTime.Value;
+                        string lostMsg = $"Marker lost for {lostTime.TotalSeconds:F1}s";
+                        Color msgColor = lostTime.TotalSeconds > 3.0 ? Color.Red : Color.Yellow;
 
-                        // Draw debug visualizations even when no marker is detected
-                        if (ShowDebugInfo && currentMode != DetectionMode.ColorOnly)
+                        g.DrawString(lostMsg, new Font("Arial", 12, FontStyle.Bold),
+                                    new SolidBrush(msgColor), 10, displayBox.Height - 30);
+
+                        // If using stricter detection, show this info
+                        if (lostTime.TotalSeconds > 1.0)
                         {
-                            shapeRecognizer.DrawDetectionVisuals(g, scaleX, scaleY);
+                            string modeMsg = "Using stricter detection criteria";
+                            g.DrawString(modeMsg, new Font("Arial", 10, FontStyle.Italic),
+                                        Brushes.Orange, 10, displayBox.Height - 50);
                         }
-
-                        if (ShowColorMask && (currentMode != DetectionMode.ShapeOnly))
-                        {
-                            colorRecognizer.DrawDetectionVisuals(g, frame, targetColor, scaleX, scaleY);
-                        }
-
-                        DrawStatusInformation(g, "No marker detected", null);
                     }
-                    displayBox.Invalidate();
                 }
-
-                // IMPORTANT ADDITION: Send a "null" position to indicate marker is not detected
-                // This will signal the drawing system to stop drawing
-                OnMarkerDetected(new Point(0, 0), new Size(frame.Width, frame.Height));
             }
         }
+                
+            
+        
 
         private void DrawMarkerIndicator(Graphics g, int x, int y, string source)
         {

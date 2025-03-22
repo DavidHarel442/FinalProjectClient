@@ -137,6 +137,7 @@
     <Compile Include="AESEncryption.cs" />
     <Compile Include="CameraAndRecognizing\CameraHandler.cs" />
     <Compile Include="CameraAndRecognizing\ColorRecognizer.cs" />
+    <Compile Include="CameraAndRecognizing\MarkerDetectionExtensions.cs" />
     <Compile Include="CameraAndRecognizing\MarkerRecognizer.cs" />
     <Compile Include="CameraAndRecognizing\ShapeRecognizer.cs" />
     <Compile Include="CameraManager.cs" />

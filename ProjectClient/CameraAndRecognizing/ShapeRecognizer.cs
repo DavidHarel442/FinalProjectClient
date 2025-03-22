@@ -27,6 +27,17 @@ namespace ProjectClient.CameraAndRecognizing
         private Color targetColor;
         private int samplingStep = 2;
 
+        private int consecutiveLostFrames = 0;
+        private int maxConsecutiveLostFrames = 30; // About 1 second at 30 FPS
+        private bool useAdaptiveColorRange = false;
+        private int baseHueRange = 15;
+        private int baseSatRange = 50;
+        private int baseValRange = 50;
+        private int currentHueRange = 15;
+        private int currentSatRange = 50;
+        private int currentValRange = 50;
+        private int adaptiveSatRangeIncrease = 20;
+        private int adaptiveValRangeIncrease = 20;
         // Shape detection parameters
         private double minArea = 500;  // Minimum contour area to consider
         private double maxArea = 2000; // Maximum contour area to consider
@@ -40,7 +51,7 @@ namespace ProjectClient.CameraAndRecognizing
 
         // For visualization
         private OpenCvPoint[] lastDetectedContour = null;
-        private DrawingPoint lastDetectedCenter = new DrawingPoint(0, 0);
+        public DrawingPoint lastDetectedCenter = new DrawingPoint(0, 0);
         private double lastMatchScore = 0;
         
         /// <summary>
@@ -181,35 +192,41 @@ namespace ProjectClient.CameraAndRecognizing
             int h, s, v;
             RgbToHsv(targetRgbColor.R, targetRgbColor.G, targetRgbColor.B, out h, out s, out v);
 
-            // Adjust HSV ranges based on the color's properties
-            // For brighter colors (highlighters), we need wider hue ranges
-            int hRange = 20;  // Increased hue range for better detection
-            int sRange = 85;  // Increased saturation range
-            int vRange = 85;  // Increased value range for better detection in varying lighting
+            // Use standard or adaptive color ranges
+            int hRange = currentHueRange;
+            int sRange = currentSatRange;
+            int vRange = currentValRange;
 
-            // For colors with low saturation (pastels, whites), focus more on value
-            if (s < 50)
+            // If the marker is lost for a while, expand the color ranges
+            if (useAdaptiveColorRange && markerLostTime.HasValue)
             {
-                sRange = 100;
-                vRange = 60;
+                TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
+
+                // Gradually increase color ranges based on how long marker has been lost
+                if (lostDuration.TotalSeconds > 1.0)
+                {
+                    // For persistent loss (>1 sec), expand saturation and value ranges
+                    // but be more conservative with hue to maintain color accuracy
+                    double expansionFactor = Math.Min(1.0, (lostDuration.TotalSeconds - 1.0) / 2.0);
+
+                    // Expand saturation and value ranges more aggressively
+                    sRange += (int)(adaptiveSatRangeIncrease * expansionFactor);
+                    vRange += (int)(adaptiveValRangeIncrease * expansionFactor);
+
+                    // Hue is most critical for color identification, so expand it less
+                    hRange += (int)(5 * expansionFactor);
+
+                    // Log changes occasionally
+                    if (DateTime.Now.Second % 10 == 0 && DateTime.Now.Millisecond < 20)
+                    {
+                        Console.WriteLine($"Adaptive color ranges: H±{hRange}, S±{sRange}, V±{vRange} " +
+                                         $"(lost for {lostDuration.TotalSeconds:F1}s)");
+                    }
+                }
             }
 
-            // For very dark colors, focus more on hue and saturation
-            if (v < 50)
-            {
-                hRange = 25;
-                sRange = 100;
-                vRange = 100;
-            }
-
-            // Debug output occasionally
-            if (DateTime.Now.Second % 10 == 0 && DateTime.Now.Millisecond < 50)
-            {
-                Console.WriteLine($"Color mask HSV: H={h}, S={s}, V={v}, Ranges: H±{hRange}, S±{sRange}, V±{vRange}");
-            }
-
-            // Create range for color based on color type
-            Scalar lowerBound, upperBound;
+            // The rest of your CreateColorMask method...
+            // Same as your existing code, just use hRange, sRange, vRange variables
 
             // Handle the special case of red which wraps around the hue value
             if (h < 15 || h > 165)
@@ -220,8 +237,8 @@ namespace ProjectClient.CameraAndRecognizing
 
                 if (h > 165)
                 {
-                    lowerBound = new Scalar(h - hRange, Math.Max(s - sRange, 30), Math.Max(v - vRange, 30));
-                    upperBound = new Scalar(180, 255, 255);
+                    var lowerBound = new Scalar(h - hRange, Math.Max(s - sRange, 30), Math.Max(v - vRange, 30));
+                    var upperBound = new Scalar(180, 255, 255);
                     Cv2.InRange(hsvImage, lowerBound, upperBound, maskHigh);
 
                     lowerBound = new Scalar(0, Math.Max(s - sRange, 30), Math.Max(v - vRange, 30));
@@ -230,8 +247,8 @@ namespace ProjectClient.CameraAndRecognizing
                 }
                 else // h < 15
                 {
-                    lowerBound = new Scalar(0, Math.Max(s - sRange, 30), Math.Max(v - vRange, 30));
-                    upperBound = new Scalar(h + hRange, 255, 255);
+                    var lowerBound = new Scalar(0, Math.Max(s - sRange, 30), Math.Max(v - vRange, 30));
+                    var upperBound = new Scalar(h + hRange, 255, 255);
                     Cv2.InRange(hsvImage, lowerBound, upperBound, maskHigh);
 
                     lowerBound = new Scalar(180 - hRange, Math.Max(s - sRange, 30), Math.Max(v - vRange, 30));
@@ -252,19 +269,20 @@ namespace ProjectClient.CameraAndRecognizing
             else
             {
                 // For all other colors
-                lowerBound = new Scalar(Math.Max(h - hRange, 0), Math.Max(s - sRange, 30), Math.Max(v - vRange, 30));
-                upperBound = new Scalar(Math.Min(h + hRange, 180), 255, 255);
+                var lowerBound = new Scalar(Math.Max(h - hRange, 0), Math.Max(s - sRange, 30), Math.Max(v - vRange, 30));
+                var upperBound = new Scalar(Math.Min(h + hRange, 180), 255, 255);
 
                 Mat mask = new Mat();
                 Cv2.InRange(hsvImage, lowerBound, upperBound, mask);
                 return mask;
             }
         }
+    
 
-        /// <summary>
-        /// Convert RGB to HSV color space
-        /// </summary>
-        private void RgbToHsv(int r, int g, int b, out int h, out int s, out int v)
+    /// <summary>
+    /// Convert RGB to HSV color space
+    /// </summary>
+    private void RgbToHsv(int r, int g, int b, out int h, out int s, out int v)
         {
             // Convert RGB ranges from 0-255 to 0-1
             double red = r / 255.0;
@@ -524,7 +542,7 @@ namespace ProjectClient.CameraAndRecognizing
                         // No suitable match found
                         return null;
                     }
-                }
+                }  
             }
             catch (Exception ex)
             {
@@ -538,18 +556,35 @@ namespace ProjectClient.CameraAndRecognizing
         {
             currentAcceptanceThreshold = baseAcceptanceThreshold;
             markerLostTime = null;
+            consecutiveLostFrames = 0;
+            useAdaptiveColorRange = false;
+            currentHueRange = baseHueRange;
+            currentSatRange = baseSatRange;
+            currentValRange = baseValRange;
             Console.WriteLine("Detection thresholds reset to default values");
         }
-        public void ConfigureAdaptiveThreshold(double baseThreshold, double strictThreshold, double delaySeconds)
+        public void ConfigureAdaptiveThreshold(double baseThreshold, double mediumThreshold, double strictThreshold,
+                                     double colorDelaySeconds, double shapeDelaySeconds)
         {
             baseAcceptanceThreshold = Math.Max(0.3, Math.Min(0.8, baseThreshold));
             strictAcceptanceThreshold = Math.Max(baseAcceptanceThreshold + 0.1, strictThreshold);
-            thresholdIncreaseDelay = TimeSpan.FromSeconds(Math.Max(0.5, delaySeconds));
+            thresholdIncreaseDelay = TimeSpan.FromSeconds(Math.Max(0.5, colorDelaySeconds));
             currentAcceptanceThreshold = baseAcceptanceThreshold;
             markerLostTime = null;
 
             Console.WriteLine($"Adaptive threshold configured: Base={baseAcceptanceThreshold:F2}, " +
-                             $"Strict={strictAcceptanceThreshold:F2}, Delay={thresholdIncreaseDelay.TotalSeconds:F1}s");
+                             $"Strict={strictAcceptanceThreshold:F2}, Color Delay={colorDelaySeconds:F1}s, " +
+                             $"Shape Delay={shapeDelaySeconds:F1}s");
+        }
+        public void EnableAdaptiveColorRange(bool enable)
+        {
+            useAdaptiveColorRange = enable;
+            if (!enable)
+            {
+                currentHueRange = baseHueRange;
+                currentSatRange = baseSatRange;
+                currentValRange = baseValRange;
+            }
         }
         /// <summary>
         /// Calculate how well a contour matches our reference shape

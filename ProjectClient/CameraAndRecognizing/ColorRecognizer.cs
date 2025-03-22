@@ -15,6 +15,10 @@ namespace ProjectClient.CameraAndRecognizing
     /// </summary>
     public class ColorRecognizer
     {
+        private int baseColorThreshold = 50;
+        private int strictColorThreshold = 30;
+        private int currentColorThreshold = 50;
+        private DateTime? lastColorThresholdAdjustment = null;
         // Color detection settings
         private const int DEFAULT_COLOR_THRESHOLD = 50;
         private int colorThreshold = DEFAULT_COLOR_THRESHOLD;
@@ -343,5 +347,101 @@ namespace ProjectClient.CameraAndRecognizing
                     (10 + swatchSize + 5) * scaleY);
             }
         }
+        public void ConfigureAdaptiveThreshold(int baseThreshold, int strictThreshold)
+        {
+            baseColorThreshold = Math.Max(20, baseThreshold);
+            strictColorThreshold = Math.Min(baseColorThreshold - 10, strictThreshold);
+            currentColorThreshold = baseColorThreshold;
+            Console.WriteLine($"Color thresholds set: Base={baseColorThreshold}, Strict={strictColorThreshold}");
+        }
+        /// <summary>
+        /// Update color threshold based on marker detection status with specific timing
+        /// </summary>
+        public void UpdateColorThreshold(bool markerLost, DateTime? lostTime)
+        {
+            // Reset threshold if no adaptive behavior needed
+            if (!markerLost || !lostTime.HasValue)
+            {
+                // Gradually return to base threshold if not at base already
+                if (currentColorThreshold != baseColorThreshold &&
+                    (DateTime.Now - (lastColorThresholdAdjustment ?? DateTime.Now)).TotalSeconds > 0.5)
+                {
+                    if (currentColorThreshold < baseColorThreshold)
+                    {
+                        currentColorThreshold = Math.Min(baseColorThreshold, currentColorThreshold + 5);
+                    }
+                    else
+                    {
+                        currentColorThreshold = Math.Max(baseColorThreshold, currentColorThreshold - 5);
+                    }
+                    lastColorThresholdAdjustment = DateTime.Now;
+                }
+                return;
+            }
+
+            // Calculate how long the marker has been lost
+            TimeSpan lostDuration = DateTime.Now - lostTime.Value;
+
+            // Exactly at 1 second: Apply strict color threshold immediately
+            // This matches the requirement to become stricter with color after 1 second
+            if (lostDuration.TotalSeconds >= 1.0 && lostDuration.TotalSeconds < 1.1 &&
+                currentColorThreshold > strictColorThreshold)
+            {
+                // Make significant immediate change to color threshold
+                int previousThreshold = currentColorThreshold;
+                currentColorThreshold = strictColorThreshold;
+                lastColorThresholdAdjustment = DateTime.Now;
+
+                Console.WriteLine($"STAGE 1 STRICTNESS: Color threshold changed from {previousThreshold} to {currentColorThreshold} (strict color detection active)");
+            }
+            // Between 1-1.5 seconds: Maintain strict color threshold
+            else if (lostDuration.TotalSeconds >= 1.0 && lostDuration.TotalSeconds < 1.5)
+            {
+                // Keep color detection strict during this period
+                if (currentColorThreshold > strictColorThreshold &&
+                    (DateTime.Now - (lastColorThresholdAdjustment ?? DateTime.Now)).TotalMilliseconds > 200)
+                {
+                    currentColorThreshold = strictColorThreshold;
+                    lastColorThresholdAdjustment = DateTime.Now;
+                }
+            }
+            // Between 1.5-3 seconds: Keep strict but allow minor relaxation
+            else if (lostDuration.TotalSeconds >= 1.5 && lostDuration.TotalSeconds < 3.0)
+            {
+                // Keep color detection mostly strict during this period
+                // but allow minimal relaxation if needed to improve detection chances
+                if (currentColorThreshold > strictColorThreshold + 5 &&
+                    (DateTime.Now - (lastColorThresholdAdjustment ?? DateTime.Now)).TotalMilliseconds > 200)
+                {
+                    currentColorThreshold = Math.Max(strictColorThreshold, currentColorThreshold - 2);
+                    lastColorThresholdAdjustment = DateTime.Now;
+                }
+            }
+            // After 3+ seconds: Gradually relax color threshold
+            else if (lostDuration.TotalSeconds >= 3.0)
+            {
+                // After extended loss, gradually relax color threshold to improve detection chances
+                if (currentColorThreshold < baseColorThreshold &&
+                    (DateTime.Now - (lastColorThresholdAdjustment ?? DateTime.Now)).TotalMilliseconds > 300)
+                {
+                    currentColorThreshold = Math.Min(baseColorThreshold + 10, currentColorThreshold + 3);
+                    lastColorThresholdAdjustment = DateTime.Now;
+
+                    if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 50)
+                    {
+                        Console.WriteLine($"After {lostDuration.TotalSeconds:F1}s: Color threshold relaxed to {currentColorThreshold} (improving detection chances)");
+                    }
+                }
+            }
+
+            // Log current state occasionally
+            if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 20 &&
+                lostDuration.TotalSeconds >= 1.0)
+            {
+                Console.WriteLine($"Current color threshold: {currentColorThreshold} " +
+                                 $"(Base: {baseColorThreshold}, Strict: {strictColorThreshold})");
+            }
+        }
     }
 }
+
