@@ -138,8 +138,8 @@ namespace ProjectClient.CameraAndRecognizing
                 // Parameters: baseThreshold, mediumThreshold, strictThreshold, colorDelaySeconds, shapeDelaySeconds
                 //   - Base threshold: Normal operation
                 //   - Medium threshold: After 1 second (color strictness trigger)
-                //   - Strict threshold: After 1.5 seconds (shape strictness trigger)
-                shapeRecognizer.ConfigureAdaptiveThreshold(0.5, 0.65, 0.8, 1.0, 1.5);
+                //   - Strict threshold: After 2 seconds (shape strictness trigger)
+                shapeRecognizer.ConfigureAdaptiveThreshold(0.5, 0.65, 0.8, 1.0, 2.0);
                 shapeRecognizer.EnableAdaptiveColorRange(true);
 
                 // Configure color recognizer for adaptive thresholds
@@ -148,7 +148,7 @@ namespace ProjectClient.CameraAndRecognizing
 
                 Console.WriteLine("Tiered adaptive detection enabled with the following stages:");
                 Console.WriteLine("  - Stage 1 (at 1.0s): Stricter with color and location");
-                Console.WriteLine("  - Stage 2 (at 1.5s): Stricter with shape detection");
+                Console.WriteLine("  - Stage 2 (at 2.0s): Stricter with shape detection");
                 Console.WriteLine("  - Reset: Gradual return to normal thresholds after marker is found");
             }
             else
@@ -226,13 +226,44 @@ namespace ProjectClient.CameraAndRecognizing
             if (markerLostTime.HasValue)
             {
                 TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
-                if (lostDuration.TotalSeconds > 1.0)
+
+                // Update color threshold after 1 second of marker loss
+                colorRecognizer.UpdateColorThreshold(true, markerLostTime);
+
+                // Update shape threshold with both delay stages 
+                shapeRecognizer.UpdateAdaptiveThreshold(true, markerLostTime, 1.0, 2.0);
+
+                // Add debug info to display
+                if (displayBox != null && displayBox.Image != null)
                 {
-                    // Make distance constraint stricter as lost time increases
-                    maxAllowedDistance *= Math.Max(0.5, 1.0 - (lostDuration.TotalSeconds - 1.0) / 5.0);
+                    using (Graphics g = Graphics.FromImage(displayBox.Image))
+                    {
+                        string lostMsg = $"Marker lost for {lostDuration.TotalSeconds:F1}s";
+                        Color msgColor = Color.Yellow;
+
+                        // Change color based on strictness stage
+                        if (lostDuration.TotalSeconds >= 2.0)
+                        {
+                            msgColor = Color.Red;
+                            lostMsg += " - Stage 2 (Strict)";
+                        }
+                        else if (lostDuration.TotalSeconds >= 1.0)
+                        {
+                            msgColor = Color.Orange;
+                            lostMsg += " - Stage 1 (Medium)";
+                        }
+
+                        g.DrawString(lostMsg, new Font("Arial", 12, FontStyle.Bold),
+                                    new SolidBrush(msgColor), 10, displayBox.Height - 30);
+                    }
                 }
             }
-
+            else
+            {
+                // Reset thresholds when marker is found
+                colorRecognizer.UpdateColorThreshold(false, null);
+                shapeRecognizer.UpdateAdaptiveThreshold(false, null, 1.0, 2.0);
+            }
             if (currentMode == DetectionMode.Combined)
             {
                 // If both strategies find a marker, check if they're close to each other

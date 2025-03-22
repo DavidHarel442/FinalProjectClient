@@ -563,6 +563,61 @@ namespace ProjectClient.CameraAndRecognizing
             currentValRange = baseValRange;
             Console.WriteLine("Detection thresholds reset to default values");
         }
+        public void UpdateAdaptiveThreshold(bool markerLost, DateTime? lostTime, double colorDelaySeconds, double shapeDelaySeconds)
+        {
+            // Reset threshold if no adaptive behavior needed
+            if (!markerLost || !lostTime.HasValue)
+            {
+                // Gradually return to base threshold if not at base already
+                if (Math.Abs(currentAcceptanceThreshold - baseAcceptanceThreshold) > 0.01)
+                {
+                    currentAcceptanceThreshold = Math.Max(
+                        baseAcceptanceThreshold,
+                        currentAcceptanceThreshold - 0.03);
+
+                    if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 20)
+                    {
+                        Console.WriteLine($"Shape threshold decreasing to {currentAcceptanceThreshold:F2}");
+                    }
+                }
+
+                markerLostTime = null;
+                return;
+            }
+
+            // Calculate how long the marker has been lost
+            TimeSpan lostDuration = DateTime.Now - lostTime.Value;
+
+            // Between 1-2 seconds: Apply medium color threshold
+            if (lostDuration.TotalSeconds >= colorDelaySeconds && lostDuration.TotalSeconds < shapeDelaySeconds)
+            {
+                // Apply stricter color thresholds but not yet strict shape thresholds
+                if (currentAcceptanceThreshold > baseAcceptanceThreshold &&
+                    currentAcceptanceThreshold < strictAcceptanceThreshold)
+                {
+                    // Stay at current mid-level strictness
+                    return;
+                }
+
+                // Apply medium threshold for the first time
+                double mediumThreshold = (baseAcceptanceThreshold + strictAcceptanceThreshold) / 2;
+                if (Math.Abs(currentAcceptanceThreshold - mediumThreshold) > 0.01)
+                {
+                    currentAcceptanceThreshold = mediumThreshold;
+                    Console.WriteLine($"STAGE 1 STRICTNESS: Shape threshold changed to {currentAcceptanceThreshold:F2} (medium strictness)");
+                }
+            }
+            // After 2+ seconds: Apply full strict shape threshold 
+            else if (lostDuration.TotalSeconds >= shapeDelaySeconds)
+            {
+                // Apply full strictness for shape detection
+                if (currentAcceptanceThreshold < strictAcceptanceThreshold)
+                {
+                    currentAcceptanceThreshold = strictAcceptanceThreshold;
+                    Console.WriteLine($"STAGE 2 STRICTNESS: Shape threshold changed to {currentAcceptanceThreshold:F2} (strict shape detection)");
+                }
+            }
+        }
         public void ConfigureAdaptiveThreshold(double baseThreshold, double mediumThreshold, double strictThreshold,
                                      double colorDelaySeconds, double shapeDelaySeconds)
         {

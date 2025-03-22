@@ -204,7 +204,15 @@ namespace ProjectClient
         /// </summary>
         public bool StartCamera()
         {
-            return cameraHandler.StartCamera();
+            bool result = cameraHandler.StartCamera();
+            if (result)
+            {
+                // Enable adaptive detection when camera starts
+                markerRecognizer.SetAdaptiveDetection(true);
+                Console.WriteLine("Camera started with adaptive detection enabled");
+            }
+
+            return result;
         }
 
         /// <summary>
