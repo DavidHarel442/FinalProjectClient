@@ -15,7 +15,7 @@ namespace ProjectClient.CameraAndRecognizing
     public class MarkerRecognizer
     {
         // Marker detection strategies
-        private ColorRecognizer colorRecognizer;
+        public ColorRecognizer colorRecognizer;
         public ShapeRecognizer shapeRecognizer;
         private Queue<Point> recentPositions = new Queue<Point>(20); // Store recent positions for trail effect
         private bool drawingActive = false; // Set this based on the isMarkerDrawingEnabled flag
@@ -80,7 +80,13 @@ namespace ProjectClient.CameraAndRecognizing
             colorRecognizer = new ColorRecognizer();
             shapeRecognizer = new ShapeRecognizer();
         }
-
+        public void ResetMarkerLostStatus()
+        {
+            markerLostTime = null;
+            consecutiveNoDetectionFrames = 0;
+            maxDistanceFactorWhenLost = 0.15; // Reset to default value
+            Console.WriteLine("Marker lost status reset - default detection sensitivity restored");
+        }
         /// <summary>
         /// Configure detection settings
         /// </summary>
@@ -134,21 +140,18 @@ namespace ProjectClient.CameraAndRecognizing
         {
             if (enable)
             {
-                // Configure shape recognizer for tiered adaptive detection
-                // Parameters: baseThreshold, mediumThreshold, strictThreshold, colorDelaySeconds, shapeDelaySeconds
-                //   - Base threshold: Normal operation
-                //   - Medium threshold: After 1 second (color strictness trigger)
-                //   - Strict threshold: After 2 seconds (shape strictness trigger)
-                shapeRecognizer.ConfigureAdaptiveThreshold(0.5, 0.65, 0.8, 1.0, 2.0);
+                // Configure shape recognizer for single-threshold adaptive detection
+                // All strictness applied at 1 second mark
+                // Parameters: baseThreshold, strictThreshold, colorDelaySeconds
+                shapeRecognizer.ConfigureAdaptiveThreshold(0.5, 0.8, 1);
                 shapeRecognizer.EnableAdaptiveColorRange(true);
 
                 // Configure color recognizer for adaptive thresholds
                 // Parameters: baseThreshold, strictThreshold
                 colorRecognizer.ConfigureAdaptiveThreshold(50, 30);
 
-                Console.WriteLine("Tiered adaptive detection enabled with the following stages:");
-                Console.WriteLine("  - Stage 1 (at 1.0s): Stricter with color and location");
-                Console.WriteLine("  - Stage 2 (at 2.0s): Stricter with shape detection");
+                Console.WriteLine("Unified adaptive detection enabled:");
+                Console.WriteLine("  - After 1.0s: Stricter with color, shape, and location all at once");
                 Console.WriteLine("  - Reset: Gradual return to normal thresholds after marker is found");
             }
             else
@@ -197,6 +200,30 @@ namespace ProjectClient.CameraAndRecognizing
             if (!isCalibrated || frame == null)
                 return;
 
+            // Check if marker was previously lost, update thresholds
+            if (markerLostTime.HasValue)
+            {
+                TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
+
+                // Update all thresholds together after 1 second
+                colorRecognizer.UpdateColorThreshold(true, markerLostTime);
+                shapeRecognizer.UpdateAdaptiveThreshold(true, markerLostTime);
+
+                // If marker has been lost for more than 1 second, apply stricter position constraints
+                if (lostDuration.TotalSeconds >= 1)
+                {
+                    // Reduce the maximum allowed distance more aggressively
+                    maxDistanceFactorWhenLost = 0.08; // More restrictive position matching
+                }
+            }
+            else
+            {
+                // Reset to normal thresholds when marker is found
+                colorRecognizer.UpdateColorThreshold(false, null);
+                shapeRecognizer.UpdateAdaptiveThreshold(false, null);
+                maxDistanceFactorWhenLost = 0.15; // Normal position matching
+            }
+
             // Try to detect the marker using the appropriate strategies
             Point? colorMarker = null;
             Point? shapeMarker = null;
@@ -204,8 +231,6 @@ namespace ProjectClient.CameraAndRecognizing
             // Detect based on current mode
             if (currentMode == DetectionMode.ColorOnly || currentMode == DetectionMode.Combined)
             {
-                // Update color threshold based on marker status
-                colorRecognizer.UpdateColorThreshold(markerLostTime.HasValue, markerLostTime);
                 colorMarker = colorRecognizer.FindMarker(frame, targetColor, samplingStep);
             }
 
@@ -226,44 +251,13 @@ namespace ProjectClient.CameraAndRecognizing
             if (markerLostTime.HasValue)
             {
                 TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
-
-                // Update color threshold after 1 second of marker loss
-                colorRecognizer.UpdateColorThreshold(true, markerLostTime);
-
-                // Update shape threshold with both delay stages 
-                shapeRecognizer.UpdateAdaptiveThreshold(true, markerLostTime, 1.0, 2.0);
-
-                // Add debug info to display
-                if (displayBox != null && displayBox.Image != null)
+                if (lostDuration.TotalSeconds > 1)
                 {
-                    using (Graphics g = Graphics.FromImage(displayBox.Image))
-                    {
-                        string lostMsg = $"Marker lost for {lostDuration.TotalSeconds:F1}s";
-                        Color msgColor = Color.Yellow;
-
-                        // Change color based on strictness stage
-                        if (lostDuration.TotalSeconds >= 2.0)
-                        {
-                            msgColor = Color.Red;
-                            lostMsg += " - Stage 2 (Strict)";
-                        }
-                        else if (lostDuration.TotalSeconds >= 1.0)
-                        {
-                            msgColor = Color.Orange;
-                            lostMsg += " - Stage 1 (Medium)";
-                        }
-
-                        g.DrawString(lostMsg, new Font("Arial", 12, FontStyle.Bold),
-                                    new SolidBrush(msgColor), 10, displayBox.Height - 30);
-                    }
+                    // Make distance constraint much stricter after 1 second
+                    maxAllowedDistance *= 0.3;
                 }
             }
-            else
-            {
-                // Reset thresholds when marker is found
-                colorRecognizer.UpdateColorThreshold(false, null);
-                shapeRecognizer.UpdateAdaptiveThreshold(false, null, 1.0, 2.0);
-            }
+
             if (currentMode == DetectionMode.Combined)
             {
                 // If both strategies find a marker, check if they're close to each other
@@ -275,6 +269,10 @@ namespace ProjectClient.CameraAndRecognizing
 
                     // Use stricter proximity requirement when marker has been lost
                     double proximityThreshold = markerLostTime.HasValue ? 30 : 50;
+                    if (markerLostTime.HasValue && markerLostTime.Value.AddSeconds(1) < DateTime.Now)
+                    {
+                        proximityThreshold = 20; // Even stricter after 1 second
+                    }
 
                     if (distance < proximityThreshold) // Markers are close, we've found the target
                     {
@@ -409,7 +407,7 @@ namespace ProjectClient.CameraAndRecognizing
                 if (markerLostTime.HasValue)
                 {
                     TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
-                    if (lostDuration.TotalSeconds > 1.0)
+                    if (lostDuration.TotalSeconds > 1)
                     {
                         Console.WriteLine($"Marker found after {lostDuration.TotalSeconds:F1}s");
                     }
@@ -493,17 +491,18 @@ namespace ProjectClient.CameraAndRecognizing
                     {
                         TimeSpan lostTime = DateTime.Now - markerLostTime.Value;
                         string lostMsg = $"Marker lost for {lostTime.TotalSeconds:F1}s";
-                        Color msgColor = lostTime.TotalSeconds > 3.0 ? Color.Red : Color.Yellow;
+                        Color msgColor = lostTime.TotalSeconds > 3.0 ? Color.Red :
+                                        (lostTime.TotalSeconds > 1 ? Color.Orange : Color.Yellow);
 
                         g.DrawString(lostMsg, new Font("Arial", 12, FontStyle.Bold),
                                     new SolidBrush(msgColor), 10, displayBox.Height - 30);
 
                         // If using stricter detection, show this info
-                        if (lostTime.TotalSeconds > 1.0)
+                        if (lostTime.TotalSeconds > 1)
                         {
-                            string modeMsg = "Using stricter detection criteria";
-                            g.DrawString(modeMsg, new Font("Arial", 10, FontStyle.Italic),
-                                        Brushes.Orange, 10, displayBox.Height - 50);
+                            string modeMsg = "STRICT MODE ACTIVE: Using stricter detection criteria";
+                            g.DrawString(modeMsg, new Font("Arial", 10, FontStyle.Bold),
+                                        new SolidBrush(Color.Red), 10, displayBox.Height - 50);
                         }
                     }
                 }

@@ -88,20 +88,70 @@ namespace ProjectClient
                         SafeInvoke(() => form.ApplyDrawingAction(action));
                     break;
                 case "FullDrawingState":
+                    Console.WriteLine($"Received FullDrawingState message with data length: {message.Arguments.Length}");
                     if (currentForm is SharedDrawingForm form1)
+                    {
+                        Console.WriteLine("Found SharedDrawingForm, calling HandleFullDrawingState");
                         SafeInvoke(() => form1.HandleFullDrawingState(message.Arguments));
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error: CurrentForm is not SharedDrawingForm");
+                    }
                     break;
                 case "SendFullDrawingState":
-                    if (currentForm is SharedDrawingForm form2)
-                        SafeInvoke(() => form2.SendFullDrawingState(message.Arguments));
+                    if (currentForm is SharedDrawingForm form2) {
+                        string image = form2.GetImageAsString();
+                        SafeInvoke(() =>
+                            session.SendMessage("SendFullDrawingState", $"{message.Arguments}\t{image}"));
+                    }
+                    break;
+                case "DrawingsList":
+                    HandleDrawingsList(message.Arguments);
+                    break;
+
+                case "DrawingData":
+                    HandleDrawingData(message.Arguments);
                     break;
                 case "Success":
-                    MessageBox.Show($"Success: {message.Arguments}");
-                    SuccessHandler(message.Arguments);
+                    if (message.Arguments == "DrawingSaved")
+                    {
+                        SafeInvoke(() => {
+                            MessageBox.Show("Drawing saved successfully!", "Success",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        });
+                    }
+                    else if (message.Arguments == "DrawingDeleted")
+                    {
+                        SafeInvoke(() => {
+                            MessageBox.Show("Drawing deleted successfully!", "Success",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        });
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Success: {message.Arguments}");
+                        SuccessHandler(message.Arguments);
+                    }
                     break;
+
+                // Update your existing Issue case
                 case "Issue":
-                    MessageBox.Show($"Issue: {message.Arguments}");
-                    IssuesHandler(message.Arguments);
+                    if (message.Arguments == "DrawingNotFound" ||
+                        message.Arguments == "FailedToSaveDrawing" ||
+                        message.Arguments == "FailedToLoadDrawing" ||
+                        message.Arguments == "FailedToDeleteDrawing")
+                    {
+                        SafeInvoke(() => {
+                            MessageBox.Show($"Error: {message.Arguments}", "Drawing Operation Failed",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        });
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Issue: {message.Arguments}");
+                        IssuesHandler(message.Arguments);
+                    }
                     break;
                 case "ERROR":
                     Console.WriteLine($"Error: {message.Arguments}");
@@ -205,7 +255,202 @@ namespace ProjectClient
                 }
             }
         }
+        private void HandleDrawingsList(string drawingsListJson)
+        {
+            SafeInvoke(() =>
+            {
+                if (currentForm is SharedDrawingForm drawingForm)
+                {
+                    try
+                    {
+                        // First, deserialize from JSON to a simple string list
+                        List<string> drawingNames = JsonConvert.DeserializeObject<List<string>>(drawingsListJson);
 
+                        // Then convert to a list of DrawingMetadata objects to match your existing method
+                        List<DrawingMetadata> drawingsWithMetadata = new List<DrawingMetadata>();
+
+                        foreach (string name in drawingNames)
+                        {
+                            drawingsWithMetadata.Add(new DrawingMetadata
+                            {
+                                Name = name,
+                                CreatedBy = TcpProtocolMessage.myUsername,
+                                LastModified = DateTime.Now // We don't have the actual time, so use current time
+                            });
+                        }
+
+                        // Call your existing method with the converted list
+                        ShowDrawingsListDialog(drawingsWithMetadata);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error processing drawings list: {ex.Message}", "Error",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            });
+        }
+
+        private void HandleDrawingData(string imageData)
+        {
+            SafeInvoke(() => {
+                if (currentForm is SharedDrawingForm drawingForm)
+                {
+                    try
+                    {
+                        // The drawing will be updated via the FullDrawingState message that's broadcast to all
+                        MessageBox.Show("Drawing loaded successfully!", "Success",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error loading drawing: {ex.Message}", "Error",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            });
+        }
+
+        private void ShowDrawingsListDialog(List<DrawingMetadata> drawings)
+        {
+            if (drawings == null || drawings.Count == 0)
+            {
+                MessageBox.Show("You don't have any saved drawings.", "No Drawings",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Create a form to display drawings
+            Form drawingsDialog = new Form
+            {
+                Text = "Your Saved Drawings",
+                Size = new System.Drawing.Size(400, 500),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+
+            // Create a list box to display drawings
+            ListBox drawingsList = new ListBox
+            {
+                Location = new System.Drawing.Point(20, 20),
+                Size = new System.Drawing.Size(345, 380),
+                DisplayMember = "Name"
+            };
+
+            // Add drawings to the list
+            foreach (var drawing in drawings)
+            {
+                drawingsList.Items.Add($"{drawing.Name} (Last Modified: {drawing.LastModified.ToString("g")})");
+            }
+
+            // Create buttons for actions
+            Button loadButton = new Button
+            {
+                Text = "Load",
+                Location = new System.Drawing.Point(20, 420),
+                Size = new System.Drawing.Size(100, 30)
+            };
+
+            Button deleteButton = new Button
+            {
+                Text = "Delete",
+                Location = new System.Drawing.Point(140, 420),
+                Size = new System.Drawing.Size(100, 30)
+            };
+
+            Button closeButton = new Button
+            {
+                Text = "Close",
+                Location = new System.Drawing.Point(260, 420),
+                Size = new System.Drawing.Size(100, 30)
+            };
+
+            // Configure buttons
+            loadButton.Click += (s, e) => {
+                if (drawingsList.SelectedIndex >= 0)
+                {
+                    string selectedItem = drawingsList.SelectedItem.ToString();
+                    string drawingName = ExtractDrawingName(selectedItem);
+
+                    DialogResult result = MessageBox.Show(
+                        "Loading this drawing will replace your current work. Continue?",
+                        "Confirm Load",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        TcpServerCommunication client = ((SharedDrawingForm)currentForm).tcpServer;
+                        client.SendMessage("LoadDrawing", drawingName);
+                        drawingsDialog.Close();
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Please select a drawing to load.", "Selection Required",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
+
+            deleteButton.Click += (s, e) => {
+                if (drawingsList.SelectedIndex >= 0)
+                {
+                    string selectedItem = drawingsList.SelectedItem.ToString();
+                    string drawingName = ExtractDrawingName(selectedItem);
+
+                    DialogResult result = MessageBox.Show(
+                        $"Are you sure you want to delete '{drawingName}'? This cannot be undone.",
+                        "Confirm Delete",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        TcpServerCommunication client = ((SharedDrawingForm)currentForm).tcpServer;
+                        client.SendMessage("DeleteDrawing", drawingName);
+                        drawingsList.Items.RemoveAt(drawingsList.SelectedIndex);
+
+                        if (drawingsList.Items.Count == 0)
+                        {
+                            MessageBox.Show("No more drawings to display.", "No Drawings",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            drawingsDialog.Close();
+                        }
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Please select a drawing to delete.", "Selection Required",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
+
+            closeButton.Click += (s, e) => {
+                drawingsDialog.Close();
+            };
+
+            // Add controls to the form
+            drawingsDialog.Controls.Add(drawingsList);
+            drawingsDialog.Controls.Add(loadButton);
+            drawingsDialog.Controls.Add(deleteButton);
+            drawingsDialog.Controls.Add(closeButton);
+
+            // Show the dialog
+            drawingsDialog.ShowDialog();
+        }
+
+        private string ExtractDrawingName(string listItem)
+        {
+            // Extract drawing name from format "Name (Last Modified: date)"
+            int endOfName = listItem.IndexOf(" (");
+            if (endOfName > 0)
+            {
+                return listItem.Substring(0, endOfName);
+            }
+            return listItem; // Fallback
+        }
 
 
 

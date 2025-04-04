@@ -201,11 +201,40 @@ namespace ProjectClient
         /// <summary>
         /// Clears the drawing canvas to white
         /// </summary>
+        // Add this to your DrawingManager class or update your existing Clear method
         public void Clear()
         {
-            drawingGraphics.Clear(Color.White);
-            currentToolMode = 0;
-            drawingCanvas.Invalidate();
+            try
+            {
+                // Create a completely new bitmap with a white background
+                int width = drawingBitmap.Width;
+                int height = drawingBitmap.Height;
+
+                // Dispose the old bitmap first to prevent memory leaks
+                Bitmap oldBitmap = drawingBitmap;
+
+                // Create the new bitmap
+                Bitmap newBitmap = new Bitmap(width, height);
+                using (Graphics g = Graphics.FromImage(newBitmap))
+                {
+                    g.Clear(Color.White);
+                }
+
+                // Replace the existing bitmap with the new one
+                drawingBitmap = newBitmap;
+
+                // If the old bitmap isn't being used elsewhere, dispose it
+                if (oldBitmap != null && oldBitmap != drawingBitmap)
+                {
+                    oldBitmap.Dispose();
+                }
+
+                Console.WriteLine("Canvas cleared completely");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Clear method: {ex.Message}");
+            }
         }
         /// <summary>
         /// Sets the color of the drawing pen 

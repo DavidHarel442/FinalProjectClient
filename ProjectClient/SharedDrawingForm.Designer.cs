@@ -43,6 +43,10 @@
             this.StartDrawing = new System.Windows.Forms.Button();
             this.Label3 = new System.Windows.Forms.Label();
             this.btnCalibrateColor = new System.Windows.Forms.Button();
+            this.SaveDrawing = new System.Windows.Forms.Button();
+            this.drawingName = new System.Windows.Forms.TextBox();
+            this.label1 = new System.Windows.Forms.Label();
+            this.btnLoadDrawing = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.Camera)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.color_picker)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.drawingPic)).BeginInit();
@@ -282,11 +286,54 @@
             this.btnCalibrateColor.UseVisualStyleBackColor = true;
             this.btnCalibrateColor.Click += new System.EventHandler(this.btnCalibrateColor_Click);
             // 
+            // SaveDrawing
+            // 
+            this.SaveDrawing.Location = new System.Drawing.Point(710, 579);
+            this.SaveDrawing.Name = "SaveDrawing";
+            this.SaveDrawing.Size = new System.Drawing.Size(229, 42);
+            this.SaveDrawing.TabIndex = 97;
+            this.SaveDrawing.Text = "Save Drawing";
+            this.SaveDrawing.UseVisualStyleBackColor = true;
+            this.SaveDrawing.Click += new System.EventHandler(this.SaveDrawing_Click);
+            // 
+            // drawingName
+            // 
+            this.drawingName.Location = new System.Drawing.Point(710, 562);
+            this.drawingName.Name = "drawingName";
+            this.drawingName.Size = new System.Drawing.Size(229, 20);
+            this.drawingName.TabIndex = 98;
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Nirmala UI", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(164)))), ((int)(((byte)(165)))), ((int)(((byte)(169)))));
+            this.label1.Location = new System.Drawing.Point(708, 542);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(211, 17);
+            this.label1.TabIndex = 99;
+            this.label1.Text = "what is the name of the Drawing";
+            this.label1.Visible = false;
+            // 
+            // btnLoadDrawing
+            // 
+            this.btnLoadDrawing.Location = new System.Drawing.Point(710, 643);
+            this.btnLoadDrawing.Name = "btnLoadDrawing";
+            this.btnLoadDrawing.Size = new System.Drawing.Size(229, 42);
+            this.btnLoadDrawing.TabIndex = 100;
+            this.btnLoadDrawing.Text = "Load Drawing";
+            this.btnLoadDrawing.UseVisualStyleBackColor = true;
+            this.btnLoadDrawing.Click += new System.EventHandler(this.btnLoadDrawing_Click);
+            // 
             // SharedDrawingForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(993, 818);
+            this.Controls.Add(this.btnLoadDrawing);
+            this.Controls.Add(this.label1);
+            this.Controls.Add(this.drawingName);
+            this.Controls.Add(this.SaveDrawing);
             this.Controls.Add(this.btnCalibrateColor);
             this.Controls.Add(this.Label3);
             this.Controls.Add(this.StartDrawing);
@@ -330,5 +377,9 @@
         private System.Windows.Forms.Button StartDrawing;
         private System.Windows.Forms.Label Label3;
         private System.Windows.Forms.Button btnCalibrateColor;
+        private System.Windows.Forms.Button SaveDrawing;
+        private System.Windows.Forms.TextBox drawingName;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Button btnLoadDrawing;
     }
 }

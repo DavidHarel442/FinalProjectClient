@@ -13,6 +13,7 @@ namespace ProjectClient
     {// this form is incharge of the Shared Drawing Board
         public Point? calibrationPoint = null;
         public DateTime calibrationTime = DateTime.MinValue;
+
         public MarkerRecognizer markerRecognizer => cameraManager?.markerRecognizer;
         private DateTime? markerLostStartTime = null;
         private int markerLostTimeoutSeconds = 3; // Auto-stop drawing after 3 seconds of marker loss
@@ -34,6 +35,7 @@ namespace ProjectClient
 
         public bool isMarkerDrawingEnabled = false;
         private Point? lastMarkerPosition = null;
+        private bool isSpaceBarPressed = false;
 
         /// <summary>
         /// constructor, inizialises form
@@ -49,18 +51,23 @@ namespace ProjectClient
                 username.Text = username1;
                 MessageHandler.SetCurrentForm(this);
                 drawingManager = new DrawingManager(drawingPic);
-                cameraManager = new CameraManager(Camera,drawingManager, this);
-                drawingManager.DrawingActionPerformed += DrawingManager_DrawingActionPerformed;//This line sets up a connection (subscription) to listen for when drawing actions happens.
+                cameraManager = new CameraManager(Camera, drawingManager, this);
+                drawingManager.DrawingActionPerformed += DrawingManager_DrawingActionPerformed;
                 ToolTip toolTip = new ToolTip();
                 toolTip.SetToolTip(StartDrawing, "Drawing will auto-stop if marker is lost for " +
-                                                 markerLostTimeoutSeconds + " seconds");
+                                                   markerLostTimeoutSeconds + " seconds");
                 tcpServer.SendMessage("RequestFullDrawingState", "");
+
+                // Enable key preview so the form receives key events
+                this.KeyPreview = true;
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error initializing SharedDrawingForm: {ex.Message}");
             }
         }
+
+
 
         /// <summary>
         /// event called when pressing on the ShowCamera button, it starts/stops the camera depends on current state.
@@ -136,41 +143,31 @@ namespace ProjectClient
                 byte[] imageData = Convert.FromBase64String(base64Image);
                 using (MemoryStream ms = new MemoryStream(imageData))
                 {
+                    // Create a new bitmap from the received data
                     Bitmap receivedBitmap = new Bitmap(ms);
+
+                    // Update the picture box
                     drawingPic.Image = receivedBitmap;
-                    drawingManager.drawingBitmap = receivedBitmap;  // Add this line if bm is accessible, or create a method in DrawingManager to update the bitmap
-                    drawingPic.Refresh();  // Add this line
+
+                    // Important: Create a new bitmap for the drawing manager to avoid sharing references
+                    // which could cause issues with clearing
+                    Bitmap managerBitmap = new Bitmap(receivedBitmap);
+                    drawingManager.drawingBitmap = managerBitmap;
+
+                    // Make sure UI is updated
+                    drawingPic.Refresh();
                     drawingPic.Invalidate();
+
+                    Console.WriteLine("Full drawing state applied, size: " + imageData.Length + " bytes");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error handling full drawing state: {ex.Message}");
+                MessageBox.Show($"Error handling full drawing state: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-        /// <summary>
-        /// this function sends to the server the drawing canvas, to later be sent to the one who asked for it.
-        /// it is done by taking the current canvas and transfering it all to a MemorySteam,
-        /// then taking it from the MemoryStream into a bytes array and then to base64 and then sending it to the server. with the nickname of the one who asked for it
-        /// </summary>
-        /// <param name="clientNick"></param>
-        public void SendFullDrawingState(string clientNick)
-        {
-            try
-            {
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    drawingPic.Image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                    byte[] imageBytes = ms.ToArray();
-                    string base64Image = Convert.ToBase64String(imageBytes);
-                    tcpServer.SendMessage("SendFullDrawingState", $"{clientNick}\t{base64Image}");
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error sending full drawing state: {ex.Message}");
-            }
-        }
+
         /// <summary>
         /// this function is called when the user receives a drawingAction that another user performed, it will be accepted from the server.
         /// it calles the function "ApplyDrawingAction" that exists in the "DrawingManager" class,
@@ -207,7 +204,7 @@ namespace ProjectClient
         private void drawingPic_MouseUp(object sender, MouseEventArgs e)
         {
             drawingManager.isDrawing = false;
-            
+
         }
         /// <summary>
         /// event called when someone is moving their mouse on the pictureBox canvas, it will only do something when the user is holding.
@@ -256,14 +253,23 @@ namespace ProjectClient
         {
             try
             {
+                // Clear local canvas
                 drawingManager.Clear();
+
+                // Update the PictureBox with the new bitmap
+                drawingPic.Image = drawingManager.drawingBitmap;
+
+                // Force refresh
                 drawingPic.Invalidate();
+
+                // Create a clear action to send to server
                 DrawingAction clearAction = new DrawingAction { Type = "Clear" };
                 tcpServer.SendMessage("DrawingAction", clearAction.Serialize());
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error clearing drawing: {ex.Message}");
+                MessageBox.Show($"Error clearing drawing: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         /// <summary>
@@ -367,49 +373,55 @@ namespace ProjectClient
             {
                 if (StartDrawing.Text == "Start Drawing")
                 {
+                    // Show message box with instructions
+                    MessageBox.Show("Hold Space Bar to draw with the marker", "Drawing Mode",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+
                     StartDrawing.Text = "Stop Drawing";
                     isMarkerDrawingEnabled = true;
-                    lastMarkerPosition = null; // Reset the last position when starting a new drawing session
+                    isSpaceBarPressed = false; // Make sure this is reset
 
-                    // Update the marker recognizer drawing status
+                    // Set keyboard focus to this form to receive key events
+                    this.Focus();
+                    this.KeyPreview = true; // Important: Make sure the form receives key events
+
+                    // Rest of your existing code here
+                    lastMarkerPosition = null;
                     if (markerRecognizer != null)
                     {
                         markerRecognizer.SetDrawingStatus(true);
-
-                        // Reset adaptive thresholds when starting drawing
                         if (markerRecognizer.shapeRecognizer != null)
                         {
                             markerRecognizer.shapeRecognizer.ResetAdaptiveThreshold();
                         }
-
-                        // Reset position history to prevent awkward lines when drawing resumes
+                        if (markerRecognizer.colorRecognizer != null)
+                        {
+                            markerRecognizer.colorRecognizer.ResetThresholds();
+                        }
+                        markerRecognizer.ResetMarkerLostStatus();
                         markerRecognizer.ResetPositionHistory();
                     }
-
-                    // Make sure the camera stays visible during drawing
                     Camera.Visible = true;
+                    markerLostStartTime = null;
 
-                    Console.WriteLine("Drawing mode started - position history reset");
+                    Console.WriteLine("Drawing mode started - all thresholds reset to default values");
+                    Console.WriteLine("Hold space bar to draw");
                 }
                 else
                 {
                     StartDrawing.Text = "Start Drawing";
                     isMarkerDrawingEnabled = false;
-                    lastMarkerPosition = null; // Reset when stopping
-                    markerLostStartTime = null; // Reset the lost timer
+                    lastMarkerPosition = null;
+                    markerLostStartTime = null;
 
-                    // Update the marker recognizer drawing status  
+                    // Rest of your existing code here
                     if (markerRecognizer != null)
                     {
                         markerRecognizer.SetDrawingStatus(false);
-
-                        // Reset adaptive thresholds when stopping drawing
                         if (markerRecognizer.shapeRecognizer != null)
                         {
                             markerRecognizer.shapeRecognizer.ResetAdaptiveThreshold();
                         }
-
-                        // Reset position history when stopping drawing
                         markerRecognizer.ResetPositionHistory();
                     }
 
@@ -509,51 +521,41 @@ namespace ProjectClient
                     Label3.ForeColor = Color.Red;
                 }
             }
-           }
+        }
         public void ProcessMarkerPosition(Point markerPosition, Size cameraSize)
         {
-            // If drawing is disabled, don't process anything
+            // Check if drawing mode is enabled (Start Drawing button pressed)
             if (!isMarkerDrawingEnabled)
                 return;
 
             try
             {
-                // Keep the camera visible during marker tracking
+                // Standard marker tracking code
                 if (!Camera.Visible)
                 {
                     Camera.Visible = true;
                 }
 
-                // Check if marker was not found (received null position)
+                // Handle marker loss detection
                 if (markerPosition.X == 0 && markerPosition.Y == 0)
                 {
-                    // If this is the first time we're losing the marker, start tracking the time
+                    // Standard marker loss code
                     if (!markerLostStartTime.HasValue)
                     {
                         markerLostStartTime = DateTime.Now;
-                        Console.WriteLine("Marker lost - drawing paused. Will auto-stop if not found soon.");
                     }
                     else
                     {
-                        // Check if we've exceeded the timeout for marker loss
                         TimeSpan lostTime = DateTime.Now - markerLostStartTime.Value;
                         if (lostTime.TotalSeconds >= markerLostTimeoutSeconds)
                         {
-                            // Auto-stop drawing mode since marker has been lost for too long
-                            if (isMarkerDrawingEnabled)
+                            // Auto-stop code remains the same
+                            if (isMarkerDrawingEnabled && isSpaceBarPressed)
                             {
-                                Console.WriteLine($"Marker lost for {lostTime.TotalSeconds:F1} seconds - auto-stopping drawing mode");
-
-                                // Use Invoke to ensure we're on the UI thread
                                 this.BeginInvoke(new Action(() => {
-                                    // Simulate clicking the StartDrawing button to stop drawing
                                     StartDrawing_Click(StartDrawing, EventArgs.Empty);
-
-                                    // Show a brief notification
                                     Label3.Text = "Drawing auto-stopped - marker lost";
                                     Label3.ForeColor = Color.Orange;
-
-                                    // Reset the label after a few seconds
                                     System.Threading.Tasks.Task.Delay(3000).ContinueWith(t => {
                                         this.BeginInvoke(new Action(() => {
                                             Label3.Text = "Camera View";
@@ -562,35 +564,27 @@ namespace ProjectClient
                                     });
                                 }));
                             }
-
-                            // Reset the timer to prevent repeated triggering
                             markerLostStartTime = null;
                         }
-                        else if (lostTime.TotalSeconds >= 1.0 && DateTime.Now.Second % 2 == 0 && DateTime.Now.Millisecond < 100)
-                        {
-                            // Periodically log how long we've been waiting (reduced frequency)
-                            Console.WriteLine($"Marker still lost for {lostTime.TotalSeconds:F1} seconds");
-                        }
                     }
-
-                    // Reset last position to prevent drawing when marker reappears
                     lastMarkerPosition = null;
                     return;
                 }
                 else
                 {
-                    // Marker found - reset the lost timer
                     markerLostStartTime = null;
+                }
+
+                // SIMPLIFIED APPROACH: Only proceed with drawing if space bar is pressed
+                if (!isSpaceBarPressed)
+                {
+                    // Not drawing when space bar is not pressed
+                    lastMarkerPosition = null; // Reset position when not drawing
+                    return;
                 }
 
                 // Convert camera coordinates to drawing canvas coordinates
                 Point drawingCanvasPoint = TranslateCoordinates(markerPosition, cameraSize, drawingPic.Size);
-
-                // Reduced logging frequency
-                if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 50) // Log only every 5 seconds 
-                {
-                    Console.WriteLine($"Marker at camera({markerPosition.X},{markerPosition.Y}) -> drawing({drawingCanvasPoint.X},{drawingCanvasPoint.Y})");
-                }
 
                 // If we have a previous position, draw a line from it to the current position
                 if (lastMarkerPosition.HasValue)
@@ -603,22 +597,17 @@ namespace ProjectClient
                         Math.Pow(prevDrawingPoint.X - drawingCanvasPoint.X, 2) +
                         Math.Pow(prevDrawingPoint.Y - drawingCanvasPoint.Y, 2));
 
-                    // IMPORTANT: Check if this is potentially the first detection after a pause
-                    // If the distance is unusually large, don't draw a line
-                    bool isFirstAfterReset = distance > drawingPic.Width * 0.15; // 15% of canvas width threshold
-
-                    // Only draw if the distance is reasonable (prevents erratic jumps from causing lines)
-                    if (distance < drawingPic.Width * 0.3 && !isFirstAfterReset) // Maximum 30% of canvas width for a single stroke
+                    // Only draw if the distance is reasonable
+                    if (distance < drawingPic.Width * 0.3 && isSpaceBarPressed)
                     {
                         // Use the existing drawing mechanism to draw a line
                         DrawingAction action = drawingManager.Draw(drawingCanvasPoint, prevDrawingPoint);
                         if (action != null)
                         {
-                            // Send the drawing action to server (for multiplayer)
                             tcpServer.SendMessage("DrawingAction", action.Serialize());
                         }
 
-                        // Make sure the UI is updated
+                        // Update UI
                         if (drawingPic.InvokeRequired)
                         {
                             drawingPic.BeginInvoke(new Action(() => drawingPic.Invalidate()));
@@ -628,24 +617,13 @@ namespace ProjectClient
                             drawingPic.Invalidate();
                         }
                     }
-                    else if (isFirstAfterReset)
-                    {
-                        // Log that we're skipping the first line after reset
-                        Console.WriteLine($"First marker detection after reset - skipping initial line ({distance:F1} px)");
-                    }
-                    else if (distance > drawingPic.Width * 0.1 && DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 50)
-                    {
-                        // For medium jumps, update position but don't draw (reduced logging)
-                        Console.WriteLine($"Large movement detected ({distance:F1} px) - skipping draw");
-                    }
                 }
 
-                // Update the last known position
+                // IMPORTANT: Always update the last position when space bar is pressed
                 lastMarkerPosition = markerPosition;
             }
             catch (Exception ex)
             {
-                // Just log the error, don't disrupt the drawing flow
                 Console.WriteLine($"Error processing marker position: {ex.Message}");
             }
         }
@@ -668,5 +646,84 @@ namespace ProjectClient
             return new Point(x, y);
         }
 
+        private void SaveDrawing_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(drawingName.Text))
+            {
+                MessageBox.Show("Please enter a name for your drawing", "Name Required",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                string image = GetImageAsString();
+                if (image != null)
+                {
+                    tcpServer.SendMessage("SaveDrawing", image + '\t' + drawingName.Text);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving drawing: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        /// <summary>
+        /// this function returns the drawing canvas, to later be sent to the one who asked for it/to save the drawing .
+        /// it is done by taking the current canvas and transfering it all to a MemorySteam,
+        /// then taking it from the MemoryStream into a bytes array and then to base64 and then sending it to the server. with the nickname of the one who asked for it
+        /// </summary>
+        /// <param name="clientNick"></param>
+        public string GetImageAsString()
+        {
+            try
+            {
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    drawingPic.Image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                    byte[] imageBytes = ms.ToArray();
+                    string base64Image = Convert.ToBase64String(imageBytes);
+                    return base64Image;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error sending full drawing state: {ex.Message}");
+            }
+            return null;
+        }
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Space)
+            {
+                isSpaceBarPressed = true;
+                Console.WriteLine("Space bar pressed - drawing enabled");
+                e.Handled = true;
+            }
+            base.OnKeyDown(e);
+        }
+
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Space)
+            {
+                isSpaceBarPressed = false;
+                Console.WriteLine("Space bar released - drawing disabled");
+                e.Handled = true;
+            }
+            base.OnKeyUp(e);
+        }
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            // Keep this for other command keys
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void btnLoadDrawing_Click(object sender, EventArgs e)
+        {
+            // Request drawings list from server
+            tcpServer.SendMessage("ListDrawings", "");
+        }
     }
 }

@@ -408,6 +408,7 @@ namespace ProjectClient.CameraAndRecognizing
                             lastDetectedContour = null;
                             lastMatchScore = 0;
                             return null;
+
                         }
                         else
                         {
@@ -563,7 +564,7 @@ namespace ProjectClient.CameraAndRecognizing
             currentValRange = baseValRange;
             Console.WriteLine("Detection thresholds reset to default values");
         }
-        public void UpdateAdaptiveThreshold(bool markerLost, DateTime? lostTime, double colorDelaySeconds, double shapeDelaySeconds)
+        public void UpdateAdaptiveThreshold(bool markerLost, DateTime? lostTime)
         {
             // Reset threshold if no adaptive behavior needed
             if (!markerLost || !lostTime.HasValue)
@@ -588,48 +589,27 @@ namespace ProjectClient.CameraAndRecognizing
             // Calculate how long the marker has been lost
             TimeSpan lostDuration = DateTime.Now - lostTime.Value;
 
-            // Between 1-2 seconds: Apply medium color threshold
-            if (lostDuration.TotalSeconds >= colorDelaySeconds && lostDuration.TotalSeconds < shapeDelaySeconds)
-            {
-                // Apply stricter color thresholds but not yet strict shape thresholds
-                if (currentAcceptanceThreshold > baseAcceptanceThreshold &&
-                    currentAcceptanceThreshold < strictAcceptanceThreshold)
-                {
-                    // Stay at current mid-level strictness
-                    return;
-                }
-
-                // Apply medium threshold for the first time
-                double mediumThreshold = (baseAcceptanceThreshold + strictAcceptanceThreshold) / 2;
-                if (Math.Abs(currentAcceptanceThreshold - mediumThreshold) > 0.01)
-                {
-                    currentAcceptanceThreshold = mediumThreshold;
-                    Console.WriteLine($"STAGE 1 STRICTNESS: Shape threshold changed to {currentAcceptanceThreshold:F2} (medium strictness)");
-                }
-            }
-            // After 2+ seconds: Apply full strict shape threshold 
-            else if (lostDuration.TotalSeconds >= shapeDelaySeconds)
+            // Apply strict threshold at the specified delay point
+            if (lostDuration.TotalSeconds >= thresholdIncreaseDelay.TotalSeconds)
             {
                 // Apply full strictness for shape detection
                 if (currentAcceptanceThreshold < strictAcceptanceThreshold)
                 {
                     currentAcceptanceThreshold = strictAcceptanceThreshold;
-                    Console.WriteLine($"STAGE 2 STRICTNESS: Shape threshold changed to {currentAcceptanceThreshold:F2} (strict shape detection)");
+                    Console.WriteLine($"STRICT MODE: Shape threshold increased to {currentAcceptanceThreshold:F2} after {lostDuration.TotalSeconds:F1}s");
                 }
             }
         }
-        public void ConfigureAdaptiveThreshold(double baseThreshold, double mediumThreshold, double strictThreshold,
-                                     double colorDelaySeconds, double shapeDelaySeconds)
+        public void ConfigureAdaptiveThreshold(double baseThreshold, double strictThreshold, double delaySeconds)
         {
             baseAcceptanceThreshold = Math.Max(0.3, Math.Min(0.8, baseThreshold));
             strictAcceptanceThreshold = Math.Max(baseAcceptanceThreshold + 0.1, strictThreshold);
-            thresholdIncreaseDelay = TimeSpan.FromSeconds(Math.Max(0.5, colorDelaySeconds));
+            thresholdIncreaseDelay = TimeSpan.FromSeconds(Math.Max(0.5, delaySeconds));
             currentAcceptanceThreshold = baseAcceptanceThreshold;
             markerLostTime = null;
 
-            Console.WriteLine($"Adaptive threshold configured: Base={baseAcceptanceThreshold:F2}, " +
-                             $"Strict={strictAcceptanceThreshold:F2}, Color Delay={colorDelaySeconds:F1}s, " +
-                             $"Shape Delay={shapeDelaySeconds:F1}s");
+            Console.WriteLine($"Shape detection configured: Base={baseAcceptanceThreshold:F2}, " +
+                             $"Strict={strictAcceptanceThreshold:F2}, Delay={thresholdIncreaseDelay.TotalSeconds:F1}s");
         }
         public void EnableAdaptiveColorRange(bool enable)
         {
