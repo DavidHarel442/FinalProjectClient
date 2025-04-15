@@ -39,7 +39,6 @@ namespace ProjectClient
                 SharedDrawingForm sharedDrawing = new SharedDrawingForm(tcpServer, username.Text);
 
                 // Send message to server
-                tcpServer.SendMessage("openedDrawing", "");
 
                 // Hide the current form
                 this.Hide();

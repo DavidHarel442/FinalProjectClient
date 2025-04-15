@@ -126,7 +126,7 @@ namespace ProjectClient.CameraAndRecognizing
         {
             currentColorThreshold = baseColorThreshold;
             lastColorThresholdAdjustment = null;
-            Console.WriteLine($"Color thresholds reset to default: {baseColorThreshold}");
+            Console.WriteLine($"Color thresholds reset to fixed default: {baseColorThreshold}");
         }
         /// <summary>
         /// Find a marker in the frame based on color similarity to the target color
@@ -354,70 +354,15 @@ namespace ProjectClient.CameraAndRecognizing
         }
         public void ConfigureAdaptiveThreshold(int baseThreshold, int strictThreshold)
         {
+            // Just set the base threshold and ignore the strict threshold
             baseColorThreshold = Math.Max(20, baseThreshold);
-            strictColorThreshold = Math.Min(baseColorThreshold - 10, strictThreshold);
             currentColorThreshold = baseColorThreshold;
-            Console.WriteLine($"Color thresholds set: Base={baseColorThreshold}, Strict={strictColorThreshold}");
+            Console.WriteLine($"Color threshold set to fixed value: {baseColorThreshold}");
         }
         /// <summary>
         /// Update color threshold based on marker detection status with specific timing
         /// </summary>
-        public void UpdateColorThreshold(bool markerLost, DateTime? lostTime)
-        {
-            // Reset threshold if no adaptive behavior needed
-            if (!markerLost || !lostTime.HasValue)
-            {
-                // Gradually return to base threshold if not at base already
-                if (currentColorThreshold != baseColorThreshold &&
-                    (DateTime.Now - (lastColorThresholdAdjustment ?? DateTime.Now)).TotalSeconds > 0.5)
-                {
-                    if (currentColorThreshold < baseColorThreshold)
-                    {
-                        currentColorThreshold = Math.Min(baseColorThreshold, currentColorThreshold + 5);
-                    }
-                    else
-                    {
-                        currentColorThreshold = Math.Max(baseColorThreshold, currentColorThreshold - 5);
-                    }
-                    lastColorThresholdAdjustment = DateTime.Now;
-                }
-                return;
-            }
-
-            // Calculate how long the marker has been lost
-            TimeSpan lostDuration = DateTime.Now - lostTime.Value;
-
-            // Apply strict threshold at exactly 1 second
-            if (lostDuration.TotalSeconds >= 1.0 && lostDuration.TotalSeconds < 1.1 &&
-                currentColorThreshold > strictColorThreshold)
-            {
-                // Make significant immediate change to color threshold
-                int previousThreshold = currentColorThreshold;
-                currentColorThreshold = strictColorThreshold;
-                lastColorThresholdAdjustment = DateTime.Now;
-
-                Console.WriteLine($"STRICT MODE: Color threshold changed from {previousThreshold} to {currentColorThreshold} after 1 second");
-            }
-            // Maintain strict threshold after the 1 second mark
-            else if (lostDuration.TotalSeconds >= 1.0)
-            {
-                // Keep color detection strict during this period
-                if (currentColorThreshold > strictColorThreshold &&
-                    (DateTime.Now - (lastColorThresholdAdjustment ?? DateTime.Now)).TotalMilliseconds > 200)
-                {
-                    currentColorThreshold = strictColorThreshold;
-                    lastColorThresholdAdjustment = DateTime.Now;
-                }
-            }
-
-            // Log current state occasionally
-            if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 20 &&
-                lostDuration.TotalSeconds >= 1.0)
-            {
-                Console.WriteLine($"Current color threshold: {currentColorThreshold} " +
-                                 $"(Base: {baseColorThreshold}, Strict: {strictColorThreshold})");
-            }
-        }
+        
     }
 }
 

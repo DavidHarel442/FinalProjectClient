@@ -53,9 +53,9 @@ namespace ProjectClient
                 drawingManager = new DrawingManager(drawingPic);
                 cameraManager = new CameraManager(Camera, drawingManager, this);
                 drawingManager.DrawingActionPerformed += DrawingManager_DrawingActionPerformed;
-                ToolTip toolTip = new ToolTip();
-                toolTip.SetToolTip(StartDrawing, "Drawing will auto-stop if marker is lost for " +
-                                                   markerLostTimeoutSeconds + " seconds");
+
+
+
                 tcpServer.SendMessage("RequestFullDrawingState", "");
 
                 // Enable key preview so the form receives key events
@@ -385,26 +385,20 @@ namespace ProjectClient
                     this.Focus();
                     this.KeyPreview = true; // Important: Make sure the form receives key events
 
-                    // Rest of your existing code here
+                    // Reset tracking variables
                     lastMarkerPosition = null;
+
+                    // Reset recognizer state if available
                     if (markerRecognizer != null)
                     {
                         markerRecognizer.SetDrawingStatus(true);
-                        if (markerRecognizer.shapeRecognizer != null)
-                        {
-                            markerRecognizer.shapeRecognizer.ResetAdaptiveThreshold();
-                        }
-                        if (markerRecognizer.colorRecognizer != null)
-                        {
-                            markerRecognizer.colorRecognizer.ResetThresholds();
-                        }
-                        markerRecognizer.ResetMarkerLostStatus();
                         markerRecognizer.ResetPositionHistory();
                     }
-                    Camera.Visible = true;
-                    markerLostStartTime = null;
 
-                    Console.WriteLine("Drawing mode started - all thresholds reset to default values");
+                    // Ensure camera is visible
+                    Camera.Visible = true;
+
+                    Console.WriteLine("Drawing mode started");
                     Console.WriteLine("Hold space bar to draw");
                 }
                 else
@@ -412,16 +406,11 @@ namespace ProjectClient
                     StartDrawing.Text = "Start Drawing";
                     isMarkerDrawingEnabled = false;
                     lastMarkerPosition = null;
-                    markerLostStartTime = null;
 
-                    // Rest of your existing code here
+                    // Reset recognizer state if available
                     if (markerRecognizer != null)
                     {
                         markerRecognizer.SetDrawingStatus(false);
-                        if (markerRecognizer.shapeRecognizer != null)
-                        {
-                            markerRecognizer.shapeRecognizer.ResetAdaptiveThreshold();
-                        }
                         markerRecognizer.ResetPositionHistory();
                     }
 
@@ -536,46 +525,15 @@ namespace ProjectClient
                     Camera.Visible = true;
                 }
 
-                // Handle marker loss detection
+                // Handle marker detection
                 if (markerPosition.X == 0 && markerPosition.Y == 0)
                 {
-                    // Standard marker loss code
-                    if (!markerLostStartTime.HasValue)
-                    {
-                        markerLostStartTime = DateTime.Now;
-                    }
-                    else
-                    {
-                        TimeSpan lostTime = DateTime.Now - markerLostStartTime.Value;
-                        if (lostTime.TotalSeconds >= markerLostTimeoutSeconds)
-                        {
-                            // Auto-stop code remains the same
-                            if (isMarkerDrawingEnabled && isSpaceBarPressed)
-                            {
-                                this.BeginInvoke(new Action(() => {
-                                    StartDrawing_Click(StartDrawing, EventArgs.Empty);
-                                    Label3.Text = "Drawing auto-stopped - marker lost";
-                                    Label3.ForeColor = Color.Orange;
-                                    System.Threading.Tasks.Task.Delay(3000).ContinueWith(t => {
-                                        this.BeginInvoke(new Action(() => {
-                                            Label3.Text = "Camera View";
-                                            Label3.ForeColor = SystemColors.ControlText;
-                                        }));
-                                    });
-                                }));
-                            }
-                            markerLostStartTime = null;
-                        }
-                    }
+                    // Just record that we don't have a marker position
                     lastMarkerPosition = null;
                     return;
                 }
-                else
-                {
-                    markerLostStartTime = null;
-                }
 
-                // SIMPLIFIED APPROACH: Only proceed with drawing if space bar is pressed
+                // Only proceed with drawing if space bar is pressed
                 if (!isSpaceBarPressed)
                 {
                     // Not drawing when space bar is not pressed

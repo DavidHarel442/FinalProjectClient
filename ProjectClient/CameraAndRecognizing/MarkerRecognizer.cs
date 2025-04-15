@@ -48,7 +48,7 @@ namespace ProjectClient.CameraAndRecognizing
         private float alpha = 0.2f; // Smoothing factor
 
         // Sampling settings
-        private int samplingStep = 2;
+        public int samplingStep = 2;
 
         // State tracking
         private bool isCalibrated = false;
@@ -140,30 +140,20 @@ namespace ProjectClient.CameraAndRecognizing
         {
             if (enable)
             {
-                // Configure shape recognizer for single-threshold adaptive detection
-                // All strictness applied at 1 second mark
-                // Parameters: baseThreshold, strictThreshold, colorDelaySeconds
-                shapeRecognizer.ConfigureAdaptiveThreshold(0.5, 0.8, 1);
-                shapeRecognizer.EnableAdaptiveColorRange(true);
+                // Use default fixed values
+                shapeRecognizer.ConfigureAdaptiveThreshold(0.5, 0.5, 1);
+                colorRecognizer.ConfigureAdaptiveThreshold(50, 50);
 
-                // Configure color recognizer for adaptive thresholds
-                // Parameters: baseThreshold, strictThreshold
-                colorRecognizer.ConfigureAdaptiveThreshold(50, 30);
-
-                Console.WriteLine("Unified adaptive detection enabled:");
-                Console.WriteLine("  - After 1.0s: Stricter with color, shape, and location all at once");
-                Console.WriteLine("  - Reset: Gradual return to normal thresholds after marker is found");
+                Console.WriteLine("Fixed detection thresholds enabled");
             }
             else
             {
-                // Reset all adaptive behavior
-                shapeRecognizer.ResetAdaptiveThreshold();
-                shapeRecognizer.EnableAdaptiveColorRange(false);
+                // Reset all values to default
                 colorRecognizer.ConfigureAdaptiveThreshold(50, 50);
                 consecutiveNoDetectionFrames = 0;
                 markerLostTime = null;
 
-                Console.WriteLine("Adaptive detection disabled - using fixed thresholds");
+                Console.WriteLine("Fixed detection thresholds enabled");
             }
         }
         /// <summary>
@@ -200,29 +190,7 @@ namespace ProjectClient.CameraAndRecognizing
             if (!isCalibrated || frame == null)
                 return;
 
-            // Check if marker was previously lost, update thresholds
-            if (markerLostTime.HasValue)
-            {
-                TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
-
-                // Update all thresholds together after 1 second
-                colorRecognizer.UpdateColorThreshold(true, markerLostTime);
-                shapeRecognizer.UpdateAdaptiveThreshold(true, markerLostTime);
-
-                // If marker has been lost for more than 1 second, apply stricter position constraints
-                if (lostDuration.TotalSeconds >= 1)
-                {
-                    // Reduce the maximum allowed distance more aggressively
-                    maxDistanceFactorWhenLost = 0.08; // More restrictive position matching
-                }
-            }
-            else
-            {
-                // Reset to normal thresholds when marker is found
-                colorRecognizer.UpdateColorThreshold(false, null);
-                shapeRecognizer.UpdateAdaptiveThreshold(false, null);
-                maxDistanceFactorWhenLost = 0.15; // Normal position matching
-            }
+            // Use fixed thresholds - no dynamic adjustment
 
             // Try to detect the marker using the appropriate strategies
             Point? colorMarker = null;
@@ -243,20 +211,9 @@ namespace ProjectClient.CameraAndRecognizing
             Point? markerCenter = null;
             string detectionSource = "";
 
-            // Calculate maximum allowed distance between detections
+            // Simple maximum distance for tracking
             double frameDiagonal = Math.Sqrt(frame.Width * frame.Width + frame.Height * frame.Height);
-            double maxAllowedDistance = frameDiagonal * maxDistanceFactorWhenLost;
-
-            // If marker has been lost for a while, make distance constraint stricter
-            if (markerLostTime.HasValue)
-            {
-                TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
-                if (lostDuration.TotalSeconds > 1)
-                {
-                    // Make distance constraint much stricter after 1 second
-                    maxAllowedDistance *= 0.3;
-                }
-            }
+            double maxAllowedDistance = frameDiagonal * 0.15; // Fixed 15% of diagonal
 
             if (currentMode == DetectionMode.Combined)
             {
@@ -267,12 +224,8 @@ namespace ProjectClient.CameraAndRecognizing
                         Math.Pow(colorMarker.Value.X - shapeMarker.Value.X, 2) +
                         Math.Pow(colorMarker.Value.Y - shapeMarker.Value.Y, 2));
 
-                    // Use stricter proximity requirement when marker has been lost
-                    double proximityThreshold = markerLostTime.HasValue ? 30 : 50;
-                    if (markerLostTime.HasValue && markerLostTime.Value.AddSeconds(1) < DateTime.Now)
-                    {
-                        proximityThreshold = 20; // Even stricter after 1 second
-                    }
+                    // Use a fixed proximity requirement
+                    double proximityThreshold = 50;
 
                     if (distance < proximityThreshold) // Markers are close, we've found the target
                     {
@@ -288,15 +241,7 @@ namespace ProjectClient.CameraAndRecognizing
                             double distToColor = colorMarker.Value.DistanceTo(lastValidPosition);
                             double distToShape = shapeMarker.Value.DistanceTo(lastValidPosition);
 
-                            // If either is too far from last position when lost, reject it
-                            if (markerLostTime.HasValue &&
-                                Math.Min(distToColor, distToShape) > maxAllowedDistance)
-                            {
-                                // Neither is close enough to last position
-                                markerCenter = null;
-                                detectionSource = "Rejected (too far)";
-                            }
-                            else if (distToShape < distToColor)
+                            if (distToShape < distToColor)
                             {
                                 // Shape is closer to last position
                                 markerCenter = shapeMarker;
@@ -319,101 +264,29 @@ namespace ProjectClient.CameraAndRecognizing
                 }
                 else if (shapeMarker.HasValue)
                 {
-                    // Only shape detection succeeded - check distance from last position
-                    if (markerLostTime.HasValue && lastValidPosition.X != 0 && lastValidPosition.Y != 0)
-                    {
-                        double distance = shapeMarker.Value.DistanceTo(lastValidPosition);
-                        if (distance > maxAllowedDistance)
-                        {
-                            // Too far from last position, reject
-                            markerCenter = null;
-                            detectionSource = "Shape rejected (too far)";
-                        }
-                        else
-                        {
-                            markerCenter = shapeMarker;
-                            detectionSource = "Shape";
-                        }
-                    }
-                    else
-                    {
-                        markerCenter = shapeMarker;
-                        detectionSource = "Shape";
-                    }
+                    markerCenter = shapeMarker;
+                    detectionSource = "Shape";
                 }
                 else if (colorMarker.HasValue)
                 {
-                    // Only color detection succeeded - check distance from last position
-                    if (markerLostTime.HasValue && lastValidPosition.X != 0 && lastValidPosition.Y != 0)
-                    {
-                        double distance = colorMarker.Value.DistanceTo(lastValidPosition);
-                        if (distance > maxAllowedDistance)
-                        {
-                            // Too far from last position, reject
-                            markerCenter = null;
-                            detectionSource = "Color rejected (too far)";
-                        }
-                        else
-                        {
-                            markerCenter = colorMarker;
-                            detectionSource = "Color";
-                        }
-                    }
-                    else
-                    {
-                        markerCenter = colorMarker;
-                        detectionSource = "Color";
-                    }
+                    markerCenter = colorMarker;
+                    detectionSource = "Color";
                 }
             }
             else if (currentMode == DetectionMode.ShapeOnly)
             {
                 markerCenter = shapeMarker;
                 detectionSource = "Shape";
-
-                // Additional distance check when marker was previously lost
-                if (markerCenter.HasValue && markerLostTime.HasValue &&
-                    lastValidPosition.X != 0 && lastValidPosition.Y != 0)
-                {
-                    double distance = markerCenter.Value.DistanceTo(lastValidPosition);
-                    if (distance > maxAllowedDistance)
-                    {
-                        markerCenter = null;
-                        detectionSource = "Shape rejected (too far)";
-                    }
-                }
             }
             else // ColorOnly
             {
                 markerCenter = colorMarker;
                 detectionSource = "Color";
-
-                // Additional distance check when marker was previously lost
-                if (markerCenter.HasValue && markerLostTime.HasValue &&
-                    lastValidPosition.X != 0 && lastValidPosition.Y != 0)
-                {
-                    double distance = markerCenter.Value.DistanceTo(lastValidPosition);
-                    if (distance > maxAllowedDistance)
-                    {
-                        markerCenter = null;
-                        detectionSource = "Color rejected (too far)";
-                    }
-                }
             }
 
             if (markerCenter.HasValue)
             {
-                // Reset marker lost tracking
-                if (markerLostTime.HasValue)
-                {
-                    TimeSpan lostDuration = DateTime.Now - markerLostTime.Value;
-                    if (lostDuration.TotalSeconds > 1)
-                    {
-                        Console.WriteLine($"Marker found after {lostDuration.TotalSeconds:F1}s");
-                    }
-                    markerLostTime = null;
-                }
-
+                // Reset consecutive frames counter
                 consecutiveNoDetectionFrames = 0;
 
                 // Update last valid position for future reference
@@ -464,13 +337,6 @@ namespace ProjectClient.CameraAndRecognizing
                 // Track consecutive frames with no detection
                 consecutiveNoDetectionFrames++;
 
-                // Set the marker lost time if not already set
-                if (!markerLostTime.HasValue && consecutiveNoDetectionFrames >= 3)
-                {
-                    markerLostTime = DateTime.Now;
-                    Console.WriteLine("Marker lost, entering adaptive detection mode");
-                }
-
                 // Clear the trail if no marker is detected for several frames
                 if (consecutiveNoDetectionFrames > 10)
                 {
@@ -483,34 +349,11 @@ namespace ProjectClient.CameraAndRecognizing
                     // Send a sentinel value (0,0) to indicate marker is lost
                     OnMarkerDetected(new Point(0, 0), new Size(frame.Width, frame.Height));
                 }
-
-                // Draw adaptive status information
-                if (displayBox != null && displayBox.Image != null && markerLostTime.HasValue)
-                {
-                    using (Graphics g = Graphics.FromImage(displayBox.Image))
-                    {
-                        TimeSpan lostTime = DateTime.Now - markerLostTime.Value;
-                        string lostMsg = $"Marker lost for {lostTime.TotalSeconds:F1}s";
-                        Color msgColor = lostTime.TotalSeconds > 3.0 ? Color.Red :
-                                        (lostTime.TotalSeconds > 1 ? Color.Orange : Color.Yellow);
-
-                        g.DrawString(lostMsg, new Font("Arial", 12, FontStyle.Bold),
-                                    new SolidBrush(msgColor), 10, displayBox.Height - 30);
-
-                        // If using stricter detection, show this info
-                        if (lostTime.TotalSeconds > 1)
-                        {
-                            string modeMsg = "STRICT MODE ACTIVE: Using stricter detection criteria";
-                            g.DrawString(modeMsg, new Font("Arial", 10, FontStyle.Bold),
-                                        new SolidBrush(Color.Red), 10, displayBox.Height - 50);
-                        }
-                    }
-                }
             }
         }
-                
-            
-        
+
+
+
 
         private void DrawMarkerIndicator(Graphics g, int x, int y, string source)
         {
@@ -587,7 +430,7 @@ namespace ProjectClient.CameraAndRecognizing
             }
         }
 
-        
+
         private void DrawStatusInformation(Graphics g, string detectionSource, Point? position)
         {
             // Update status at most twice per second to avoid flickering
