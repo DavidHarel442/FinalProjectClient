@@ -327,31 +327,7 @@ namespace ProjectClient.CameraAndRecognizing
                 hue /= 360.0;
             }
         }
-        public void DrawDetectionVisuals(Graphics g, Bitmap originalFrame, Color targetColor, float scaleX, float scaleY)
-        {
-            // Draw a color swatch showing the target color
-            int swatchSize = 30;
-            Rectangle colorRect = new Rectangle(
-                (int)((originalFrame.Width - swatchSize - 10) * scaleX),
-                (int)(10 * scaleY),
-                (int)(swatchSize * scaleX),
-                (int)(swatchSize * scaleY));
 
-            using (SolidBrush colorBrush = new SolidBrush(targetColor))
-            {
-                g.FillRectangle(colorBrush, colorRect);
-                g.DrawRectangle(new Pen(Color.White, 2), colorRect);
-            }
-
-            // Label the color swatch
-            using (Font font = new Font("Arial", 8))
-            {
-                string colorText = $"R:{targetColor.R} G:{targetColor.G} B:{targetColor.B}";
-                g.DrawString(colorText, font, Brushes.White,
-                    (originalFrame.Width - swatchSize - 10) * scaleX,
-                    (10 + swatchSize + 5) * scaleY);
-            }
-        }
         public void ConfigureAdaptiveThreshold(int baseThreshold, int strictThreshold)
         {
             // Just set the base threshold and ignore the strict threshold

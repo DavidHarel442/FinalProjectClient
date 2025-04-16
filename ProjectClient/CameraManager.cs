@@ -13,6 +13,7 @@ using AForge;
 using DrawingPoint = System.Drawing.Point;
 using AForgePoint = AForge.Point;
 using ProjectClient.CameraAndRecognizing;
+using ProjectClient.ShapeRecognizing;
 
 namespace ProjectClient
 {

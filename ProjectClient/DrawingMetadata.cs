@@ -8,8 +8,8 @@ namespace ProjectClient
 {
     public class DrawingMetadata
     {
-        public string Name { get; set; }
-        public string CreatedBy { get; set; }
-        public DateTime LastModified { get; set; }
+        public string Name;
+        public string CreatedBy;
+        public DateTime LastModified;
     }
 }

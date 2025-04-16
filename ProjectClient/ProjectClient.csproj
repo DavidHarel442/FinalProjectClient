@@ -139,7 +139,7 @@
     <Compile Include="CameraAndRecognizing\ColorRecognizer.cs" />
     <Compile Include="CameraAndRecognizing\MarkerDetectionExtensions.cs" />
     <Compile Include="CameraAndRecognizing\MarkerRecognizer.cs" />
-    <Compile Include="CameraAndRecognizing\ShapeRecognizer.cs" />
+    <Compile Include="CameraAndRecognizing\PositionTracker.cs" />
     <Compile Include="CameraManager.cs" />
     <Compile Include="ChangePasswordForm.cs">
       <SubType>Form</SubType>
@@ -178,6 +178,9 @@
       <DependentUpon>RegisterForm.cs</DependentUpon>
     </Compile>
     <Compile Include="RSAEncryption.cs" />
+    <Compile Include="ShapeRecognizing\ColorMaskGenerator.cs" />
+    <Compile Include="ShapeRecognizing\ShapeAnalyzer.cs" />
+    <Compile Include="ShapeRecognizing\ShapeRecognizer.cs" />
     <Compile Include="SharedDrawingForm.cs">
       <SubType>Form</SubType>
     </Compile>
