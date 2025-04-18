@@ -43,14 +43,7 @@ namespace ProjectClient
                 Key = aes.Key;
             }
         }
-        /// <summary>
-        /// Retrieves the current encryption key.
-        /// </summary>
-        /// <returns></returns>
-        public byte[] GetKey()
-        {
-            return Key;
-        }
+
         /// <summary>
         ///  Sets a new encryption key.
         /// </summary>

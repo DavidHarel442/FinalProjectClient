@@ -7,38 +7,76 @@ using System.Threading.Tasks;
 
 namespace ProjectClient.CameraAndRecognizing
 {
+    /// <summary>
+    /// Tracks marker positions over time, providing smoothing, history management, and marker lost detection.
+    /// Helps stabilize detected marker positions and manages transitions when a marker is temporarily lost.
+    /// </summary>
     public class PositionTracker
     {
-        // Recent position tracking
-        private Queue<Point> recentPositions = new Queue<Point>(20);
+
+
+        /// <summary>
+        /// The last valid position where a marker was detected
+        /// </summary>
         private Point lastValidPosition = new Point(0, 0);
+
+        /// <summary>
+        /// Counter for frames where no marker was detected
+        /// </summary>
         private int consecutiveNoDetectionFrames = 0;
-        private DateTime? markerLostTime = null;
+
+
 
         // Position smoothing
+        /// <summary>
+        /// Flag indicating whether position smoothing is enabled
+        /// </summary>
         private bool useSmoothing = true;
-        private double smoothingStrength = 0.7;
+
+
+
+        /// <summary>
+        /// Minimum distance threshold in pixels for position changes
+        /// </summary>
         private int minDistanceThreshold = 2;
+
+        /// <summary>
+        /// Last smoothed position
+        /// </summary>
         private PointF lastPos;
+
+        /// <summary>
+        /// Flag indicating if this is the first position being tracked
+        /// </summary>
         private bool firstPos = true;
+
+        /// <summary>
+        /// Alpha value for exponential smoothing (0-1, lower = more smoothing)
+        /// </summary>
         private float alpha = 0.2f;
 
         // Tracking state
+        /// <summary>
+        /// Gets or sets the source of the detected marker position for diagnostic purposes
+        /// </summary>
         public string DetectionSource { get; set; } = "Ready";
-        private double maxDistanceFactorWhenLost = 0.15;
+
+
 
         /// <summary>
-        /// Gets the last valid position
+        /// Gets the last valid position where a marker was detected
         /// </summary>
         public Point LastValidPosition => lastValidPosition;
 
         /// <summary>
-        /// Configure the position tracker settings
+        /// Configures the position tracker settings.
         /// </summary>
+        /// <param name="useSmoothing">Whether to enable position smoothing</param>
+        /// <param name="smoothStrength">Strength of smoothing (0-1, higher = more smoothing)</param>
+        /// <param name="minMoveThreshold">Minimum movement threshold in pixels</param>
         public void Configure(bool useSmoothing, double smoothStrength, int minMoveThreshold)
         {
             this.useSmoothing = useSmoothing;
-            this.smoothingStrength = Math.Max(0, Math.Min(1.0, smoothStrength));
             this.minDistanceThreshold = Math.Max(0, minMoveThreshold);
 
             // Reset state
@@ -46,29 +84,24 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Reset the position tracker state
+        /// Resets the position tracker state.
+        /// Clears position history and resets smoothing parameters.
         /// </summary>
         public void Reset()
         {
-            recentPositions.Clear();
             firstPos = true;
             lastPos = new PointF(0, 0);
         }
 
-        /// <summary>
-        /// Reset the marker lost tracking state
-        /// </summary>
-        public void ResetMarkerLostStatus()
-        {
-            markerLostTime = null;
-            consecutiveNoDetectionFrames = 0;
-            maxDistanceFactorWhenLost = 0.15;
-            Console.WriteLine("Marker lost status reset - default detection sensitivity restored");
-        }
+
 
         /// <summary>
-        /// Update position tracking with a new detected position
+        /// Updates position tracking with a new detected position.
+        /// Handles smoothing, history management, and marker lost detection.
         /// </summary>
+        /// <param name="markerCenter">The detected marker position, or null if not detected</param>
+        /// <param name="frameSize">The size of the camera frame</param>
+        /// <returns>The tracked position after processing, null if indeterminate, or Point(0,0) if marker is lost</returns>
         public Point? Update(Point? markerCenter, Size frameSize)
         {
             if (markerCenter.HasValue)
@@ -82,10 +115,7 @@ namespace ProjectClient.CameraAndRecognizing
                 // Apply smoothing if enabled
                 Point finalPosition = useSmoothing ? SmoothPosition(markerCenter.Value) : markerCenter.Value;
 
-                // Add to recent positions
-                if (recentPositions.Count >= 20)
-                    recentPositions.Dequeue();
-                recentPositions.Enqueue(finalPosition);
+               
 
                 return finalPosition;
             }
@@ -94,11 +124,7 @@ namespace ProjectClient.CameraAndRecognizing
                 // Track consecutive frames with no detection
                 consecutiveNoDetectionFrames++;
 
-                // Clear the trail if no marker is detected for several frames
-                if (consecutiveNoDetectionFrames > 10)
-                {
-                    recentPositions.Clear();
-                }
+
 
                 // Return null if marker is lost for several frames
                 if (consecutiveNoDetectionFrames >= 3)
@@ -111,17 +137,13 @@ namespace ProjectClient.CameraAndRecognizing
             }
         }
 
-        /// <summary>
-        /// Get recent positions for visualization
-        /// </summary>
-        public Point[] GetRecentPositions()
-        {
-            return recentPositions.ToArray();
-        }
 
         /// <summary>
-        /// Apply smoothing to marker positions
+        /// Applies smoothing to marker positions to reduce jitter.
+        /// Uses exponential smoothing while preserving intentional movements.
         /// </summary>
+        /// <param name="rawPos">The raw position to smooth</param>
+        /// <returns>The smoothed position</returns>
         private Point SmoothPosition(Point rawPos)
         {
             if (firstPos)
@@ -155,6 +177,3 @@ namespace ProjectClient.CameraAndRecognizing
         }
     }
 }
-
-
-

@@ -11,34 +11,62 @@ using DrawingPoint = System.Drawing.Point;
 namespace ProjectClient.CameraAndRecognizing
 {
     /// <summary>
-    /// Main class that coordinates marker detection using different strategies
+    /// Main class that coordinates marker detection using different strategies.
+    /// Combines color and shape-based recognition approaches to provide robust
+    /// marker tracking in camera frames.
     /// </summary>
     public class MarkerRecognizer
     {
-        // Detection strategies
+        /// <summary>
+        /// Color-based marker detection strategy
+        /// </summary>
         public ColorRecognizer colorRecognizer;
+
+        /// <summary>
+        /// Shape-based marker detection strategy
+        /// </summary>
         public ShapeRecognizer shapeRecognizer;
 
-        // Associated helper classes
+        /// <summary>
+        /// Tracks and smooths marker positions over time
+        /// </summary>
         private PositionTracker positionTracker;
 
-        // Detection mode
+        /// <summary>
+        /// Available detection modes that determine which recognition strategies to use
+        /// </summary>
         private enum DetectionMode { ColorOnly, ShapeOnly, Combined }
+
+        /// <summary>
+        /// The currently active detection mode
+        /// </summary>
         private DetectionMode currentMode = DetectionMode.Combined;
 
-        // State tracking
+        /// <summary>
+        /// Flag indicating whether the recognizer has been calibrated
+        /// </summary>
         private bool isCalibrated = false;
-        private Color targetColor;
-        private bool drawingActive = false;
 
-        // Sampling settings
+        /// <summary>
+        /// The color to look for during detection, calibrated from a sample image
+        /// </summary>
+        private Color targetColor;
+
+
+
+        /// <summary>
+        /// Pixel sampling step size - higher values improve performance but reduce precision
+        /// </summary>
         public int samplingStep = 2;
 
-        // Events
+        /// <summary>
+        /// Event raised when a marker is detected in a frame
+        /// </summary>
         public event EventHandler<MarkerDetectedEventArgs> MarkerDetected;
 
         /// <summary>
-        /// Constructor initializes the strategies and helper objects
+        /// Initializes a new instance of the MarkerRecognizer class.
+        /// Creates and initializes the detection strategies and position tracker.
         /// </summary>
         public MarkerRecognizer()
         {
@@ -48,8 +76,12 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Configure detection settings
+        /// Configures detection settings for marker recognition.
         /// </summary>
+        /// <param name="samplingStep">Pixel sampling step (higher values are faster but less precise)</param>
+        /// <param name="useSmoothing">Whether to apply position smoothing</param>
+        /// <param name="smoothStrength">Strength of the smoothing effect (0-1, higher = more smoothing)</param>
+        /// <param name="minMoveThreshold">Minimum pixel movement to consider a position change</param>
         public void SetDetectionSettings(int samplingStep = 2, bool useSmoothing = true,
                                         double smoothStrength = 0.7, int minMoveThreshold = 2)
         {
@@ -59,8 +91,9 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Set the detection mode
+        /// Sets the detection mode to determine which strategies are used.
         /// </summary>
+        /// <param name="mode">The detection mode to use ("color", "shape", or any other value for combined mode)</param>
         public void SetDetectionMode(string mode)
         {
             switch (mode.ToLower())
@@ -78,8 +111,12 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Calibrate color tracking based on a point in the image
+        /// Calibrates the color tracking based on a point in the image.
+        /// Identifies the target color at the specified location and configures both recognizers.
         /// </summary>
+        /// <param name="image">The image to calibrate from</param>
+        /// <param name="clickLocation">The location in the image where the marker is located</param>
+        /// <exception cref="ArgumentNullException">Thrown when image is null</exception>
         public void CalibrateColorTracking(Bitmap image, Point clickLocation)
         {
             if (image == null)
@@ -95,40 +132,23 @@ namespace ProjectClient.CameraAndRecognizing
             Console.WriteLine($"Marker calibrated at {clickLocation.X},{clickLocation.Y} with color R:{targetColor.R} G:{targetColor.G} B:{targetColor.B}");
         }
 
-        public void SetDrawingStatus(bool isDrawing)
-        {
-            drawingActive = isDrawing;
-        }
 
+        /// <summary>
+        /// Resets the position history and tracking data.
+        /// Used when starting a new detection session or when calibrating.
+        /// </summary>
         public void ResetPositionHistory()
         {
             positionTracker.Reset();
             shapeRecognizer.lastDetectedCenter = new Point(0, 0);
         }
 
-        public void SetAdaptiveDetection(bool enable)
-        {
-            if (enable)
-            {
-                shapeRecognizer.ConfigureAdaptiveThreshold(0.5, 0.5, 1);
-                colorRecognizer.ConfigureAdaptiveThreshold(50, 50);
-                Console.WriteLine("Fixed detection thresholds enabled");
-            }
-            else
-            {
-                colorRecognizer.ConfigureAdaptiveThreshold(50, 50);
-                Console.WriteLine("Fixed detection thresholds enabled");
-            }
-        }
-
-        public void ResetMarkerLostStatus()
-        {
-            positionTracker.ResetMarkerLostStatus();
-        }
-
         /// <summary>
-        /// Process a frame to detect markers
+        /// Processes a frame to detect markers and triggers the MarkerDetected event.
+        /// The main method that drives the marker detection workflow.
         /// </summary>
+        /// <param name="frame">The frame to process</param>
+        /// <param name="displayBox">The PictureBox where the frame is displayed</param>
         public void ProcessFrame(Bitmap frame, PictureBox displayBox)
         {
             if (!isCalibrated || frame == null)
@@ -140,8 +160,6 @@ namespace ProjectClient.CameraAndRecognizing
             // Update position tracking
             Point? finalPosition = UpdatePositionTracking(markerCenter, frame.Size);
 
-
-
             // Trigger marker detected event if we have a position
             if (finalPosition.HasValue)
             {
@@ -150,8 +168,11 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Detect marker position using appropriate strategy based on current mode
+        /// Detects marker position using the appropriate strategy based on current mode.
+        /// Applies the detection strategy selected in the current mode.
         /// </summary>
+        /// <param name="frame">The frame to process</param>
+        /// <returns>The detected marker position, or null if not found</returns>
         private Point? DetectMarkerPosition(Bitmap frame)
         {
             Point? colorMarker = null;
@@ -174,8 +195,13 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Determine final marker position based on available detection results
+        /// Determines the final marker position based on the available detection results.
+        /// Applies decision logic to choose between color and shape detection results
+        /// when in combined mode.
         /// </summary>
+        /// <param name="colorMarker">The position from color detection, or null if not found</param>
+        /// <param name="shapeMarker">The position from shape detection, or null if not found</param>
+        /// <returns>The determined marker position, or null if no valid position</returns>
         private Point? DetermineMarkerPosition(Point? colorMarker, Point? shapeMarker)
         {
             if (currentMode == DetectionMode.Combined)
@@ -245,36 +271,28 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Update position tracking with new detected position
+        /// Updates position tracking with a new detected position.
+        /// Forwards the detection to the position tracker for smoothing and validation.
         /// </summary>
+        /// <param name="markerCenter">The detected marker position, or null if not found</param>
+        /// <param name="frameSize">The size of the frame</param>
+        /// <returns>The tracked and smoothed position, or null if invalid</returns>
         private Point? UpdatePositionTracking(Point? markerCenter, Size frameSize)
         {
             return positionTracker.Update(markerCenter, frameSize);
         }
 
         /// <summary>
-        /// Raise the MarkerDetected event
+        /// Raises the MarkerDetected event.
         /// </summary>
+        /// <param name="position">The detected marker position</param>
+        /// <param name="cameraSize">The size of the camera frame</param>
         protected virtual void OnMarkerDetected(Point position, Size cameraSize)
         {
             MarkerDetected?.Invoke(this, new MarkerDetectedEventArgs(position, cameraSize));
         }
 
- 
 
-        /// <summary>
-        /// Event arguments for marker detection
-        /// </summary>
-        public class MarkerDetectedEventArgs : EventArgs
-        {
-            public Point Position { get; }
-            public Size CameraSize { get; }
-
-            public MarkerDetectedEventArgs(Point position, Size cameraSize)
-            {
-                Position = position;
-                CameraSize = cameraSize;
-            }
-        }
+        
     }
 }

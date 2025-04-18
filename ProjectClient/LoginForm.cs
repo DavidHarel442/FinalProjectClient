@@ -9,7 +9,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Collections.Specialized.BitVector32;
 
 namespace ProjectClient
 {
@@ -112,26 +111,6 @@ namespace ProjectClient
             changePasswordObj = new ChangePasswordForm(tcpServer,this);
             this.Hide();
             changePasswordObj.ShowDialog();
-        }
-        /// <summary>
-        /// this function checks if the recieved password is valid.
-        /// has atleast 1 small letter. 1 capital letter. 1 special case letter, And at least 1 number
-        /// </summary>
-        /// <param name="password"></param>
-        /// <returns></returns>
-        public bool ValidatePassword(string password)
-        {
-
-            string Uppercase = @"[A-Z]";
-            string lowerCase = @"[a-z]";
-            string number = @"\d";
-            string symbol = @"[^a-zA-Z0-9]";
-            if (Regex.IsMatch(password, Uppercase) && Regex.IsMatch(password, lowerCase) && Regex.IsMatch(password, number) && Regex.IsMatch(password, symbol))
-            {
-                return true;
-            }
-            return false;
-
         }
         /// <summary>
         /// An Event Handler that occurs when someone is pressing on the 'ClearFields' button. and it clears all the fields textboxes

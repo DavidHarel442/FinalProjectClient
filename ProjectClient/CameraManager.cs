@@ -17,31 +17,63 @@ using ProjectClient.ShapeRecognizing;
 
 namespace ProjectClient
 {
+    /// <summary>
+    /// Manages camera functionality including capture, display, and marker detection.
+    /// Coordinates between hardware camera access and application UI components.
+    /// Handles camera initialization, frame processing, and marker recognition.
+    /// </summary>
     public class CameraManager
     {
+        /// <summary>
+        /// The PictureBox control where camera feed is displayed
+        /// </summary>
         private PictureBox cameraPictureBox;
-        private DrawingManager drawingManager;
+
+
+
+        /// <summary>
+        /// Reference to the parent form containing this manager
+        /// </summary>
         private SharedDrawingForm parentForm;
 
         // Components
+        /// <summary>
+        /// Handles camera device initialization and frame capture
+        /// </summary>
         private CameraHandler cameraHandler;
-        public MarkerRecognizer markerRecognizer;
-        private ColorRecognizer colorRecognizer;
-        private ShapeRecognizer shapeRecognizer;
-
-        // Camera settings
-        private int boxWidth;
-        private int boxHeight;
-        private int cameraWidth;
-        private int cameraHeight;
 
         /// <summary>
-        /// Constructor
+        /// Handles marker detection and tracking
         /// </summary>
-        public CameraManager(PictureBox cameraPictureBox, DrawingManager drawingManager, SharedDrawingForm parentForm)
+        public MarkerRecognizer markerRecognizer;
+
+
+
+
+
+        // Camera settings
+        /// <summary>
+        /// Width of the display box
+        /// </summary>
+        private int boxWidth;
+
+        /// <summary>
+        /// Height of the display box
+        /// </summary>
+        private int boxHeight;
+
+
+
+        /// <summary>
+        /// Initializes a new instance of the CameraManager class.
+        /// Sets up required references to UI components and initializes camera capture system.
+        /// </summary>
+        /// <param name="cameraPictureBox">The PictureBox control where camera feed will be displayed</param>
+        /// <param name="drawingManager">The DrawingManager for handling drawing operations</param>
+        /// <param name="parentForm">The parent form containing this manager</param>
+        public CameraManager(PictureBox cameraPictureBox  , SharedDrawingForm parentForm)
         {
             this.cameraPictureBox = cameraPictureBox;
-            this.drawingManager = drawingManager;
             this.parentForm = parentForm;
 
             boxHeight = cameraPictureBox.Height;
@@ -52,7 +84,8 @@ namespace ProjectClient
         }
 
         /// <summary>
-        /// Initialize all components and wire up events
+        /// Initializes all camera and detection components and wires up event handlers.
+        /// Creates instances of CameraHandler, ColorRecognizer, ShapeRecognizer, and MarkerRecognizer.
         /// </summary>
         private void InitializeComponents()
         {
@@ -61,8 +94,6 @@ namespace ProjectClient
             cameraHandler.FrameCaptured += CameraHandler_FrameCaptured;
 
             // Create recognizers
-            colorRecognizer = new ColorRecognizer();
-            shapeRecognizer = new ShapeRecognizer();
             markerRecognizer = new MarkerRecognizer();
 
             // Set up marker detected event
@@ -70,9 +101,12 @@ namespace ProjectClient
         }
 
         /// <summary>
-        /// Event handler for when a marker is detected
+        /// Event handler triggered when a marker is detected in the camera frame.
+        /// Forwards marker position to the parent form for processing.
         /// </summary>
-        private void MarkerRecognizer_MarkerDetected(object sender, MarkerRecognizer.MarkerDetectedEventArgs e)
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">Event arguments containing marker position and camera size</param>
+        private void MarkerRecognizer_MarkerDetected(object sender, MarkerDetectedEventArgs e)
         {
             if (parentForm != null)
             {
@@ -82,16 +116,19 @@ namespace ProjectClient
                 }));
             }
         }
+
         /// <summary>
-        /// Event handler for when a new frame is captured
+        /// Event handler triggered when a new frame is captured from the camera.
+        /// Processes each frame for display and marker detection.
+        /// Handles resizing, calibration indicator drawing, and UI updates.
         /// </summary>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">Event arguments containing the captured frame</param>
         private void CameraHandler_FrameCaptured(object sender, CameraHandler.FrameCapturedEventArgs e)
         {
             try
             {
-                // Store the camera dimensions
-                cameraWidth = e.Frame.Width;
-                cameraHeight = e.Frame.Height;
+
 
                 // Create a copy for display
                 Bitmap displayFrame = ResizeImage(e.Frame, boxWidth, boxHeight);
@@ -201,15 +238,16 @@ namespace ProjectClient
         }
 
         /// <summary>
-        /// Call this to start the camera
+        /// Starts the camera capture process and initializes marker detection.
+        /// Enables adaptive detection for improved marker tracking.
         /// </summary>
+        /// <returns>True if camera started successfully, false otherwise</returns>
         public bool StartCamera()
         {
             bool result = cameraHandler.StartCamera();
             if (result)
             {
                 // Enable adaptive detection when camera starts
-                markerRecognizer.SetAdaptiveDetection(true);
                 Console.WriteLine("Camera started with adaptive detection enabled");
             }
 
@@ -217,7 +255,7 @@ namespace ProjectClient
         }
 
         /// <summary>
-        /// Call this to stop the camera
+        /// Stops the camera capture process and releases associated resources.
         /// </summary>
         public void StopCamera()
         {
@@ -225,8 +263,16 @@ namespace ProjectClient
         }
 
         /// <summary>
-        /// Set camera quality settings
+        /// Configures quality and performance settings for both camera capture and marker detection.
+        /// Balances image quality, frame rate, and detection accuracy.
         /// </summary>
+        /// <param name="width">Target camera capture width in pixels</param>
+        /// <param name="height">Target camera capture height in pixels</param>
+        /// <param name="skipFrames">Whether to skip frames for better performance</param>
+        /// <param name="samplingStep">Pixel sampling step for marker detection (higher values improve performance but reduce precision)</param>
+        /// <param name="smoothing">Whether to enable position smoothing for marker detection</param>
+        /// <param name="smoothStrength">Strength of the smoothing effect (0-1, higher = more smoothing)</param>
+        /// <param name="minMoveThreshold">Minimum pixel movement threshold to consider a position change</param>
         public void SetQualitySettings(int width, int height, bool skipFrames,
                                       int samplingStep = 2, bool smoothing = true,
                                       double smoothStrength = 0.7, int minMoveThreshold = 2)
@@ -239,8 +285,11 @@ namespace ProjectClient
         }
 
         /// <summary>
-        /// Calibrate color tracking
+        /// Calibrates the color tracking system based on a point in the camera image.
+        /// Identifies the target color at the specified location for marker detection.
         /// </summary>
+        /// <param name="clickLocation">The location in the image to calibrate from</param>
+        /// <exception cref="Exception">Thrown when no camera image is available for calibration</exception>
         public void CalibrateColorTracking(System.Drawing.Point clickLocation)
         {
             if (cameraPictureBox.Image == null)
@@ -253,8 +302,13 @@ namespace ProjectClient
         }
 
         /// <summary>
-        /// Resize an image to the specified dimensions
+        /// Resizes an image to the specified dimensions while maintaining quality.
+        /// Uses bilinear interpolation for a balance of speed and quality.
         /// </summary>
+        /// <param name="original">The original bitmap to resize</param>
+        /// <param name="newWidth">The target width in pixels</param>
+        /// <param name="newHeight">The target height in pixels</param>
+        /// <returns>A new Bitmap with the specified dimensions</returns>
         private Bitmap ResizeImage(Bitmap original, int newWidth, int newHeight)
         {
             Bitmap resized = new Bitmap(newWidth, newHeight);
@@ -269,6 +323,5 @@ namespace ProjectClient
             }
             return resized;
         }
-
     }
 }

@@ -11,35 +11,63 @@ namespace ProjectClient.ShapeRecognizing
     /// <summary>
     /// Class responsible for shape-based marker detection using OpenCV.
     /// Acts as a facade to coordinate the specialized components.
+    /// Detects markers based on both color and shape characteristics.
     /// </summary>
     public class ShapeRecognizer
     {
-        #region Fields and Properties
-
-        // Components (private implementation details)
+        /// <summary>
+        /// Component for generating color masks from HSV images
+        /// </summary>
         private readonly ColorMaskGenerator _colorMaskGenerator;
+
+        /// <summary>
+        /// Component for analyzing shape properties and matching
+        /// </summary>
         private readonly ShapeAnalyzer _shapeAnalyzer;
 
         // Detection state
+        /// <summary>
+        /// Flag indicating if the recognizer has been calibrated
+        /// </summary>
         private bool _isCalibrated = false;
+
+        /// <summary>
+        /// The target color to look for
+        /// </summary>
         private Color _targetColor;
-        private OpenCvPoint[] _lastDetectedContour = null;
+
+
+
+        /// <summary>
+        /// The match score from the last detection
+        /// </summary>
         private double _lastMatchScore = 0;
 
         // Constants
+        /// <summary>
+        /// Minimum score threshold for accepting a shape match
+        /// </summary>
         private const double ACCEPTANCE_THRESHOLD = 0.5;
+
+        /// <summary>
+        /// Minimum area for contours to be considered (in pixels)
+        /// </summary>
         private const double MIN_AREA = 500;
+
+        /// <summary>
+        /// Maximum area for contours to be considered (in pixels)
+        /// </summary>
         private const double MAX_AREA = 2000;
 
         // Public state for compatibility with MarkerRecognizer
+        /// <summary>
+        /// Center point of the last detected marker
+        /// </summary>
         public DrawingPoint lastDetectedCenter = new DrawingPoint(0, 0);
 
-        #endregion
-
-        #region Constructor
-
         /// <summary>
-        /// Initializes a new ShapeRecognizer
+        /// Initializes a new instance of the ShapeRecognizer class.
+        /// Creates and initializes the color mask generator and shape analyzer components.
         /// </summary>
         public ShapeRecognizer()
         {
@@ -47,13 +75,14 @@ namespace ProjectClient.ShapeRecognizing
             _shapeAnalyzer = new ShapeAnalyzer();
         }
 
-        #endregion
-
-        #region Public Methods - Interface for MarkerRecognizer
-
         /// <summary>
-        /// Calibrates the detector with a marker's color and shape
+        /// Calibrates the detector with a marker's color and shape.
+        /// Analyzes the image at the specified location to extract reference color and shape properties.
         /// </summary>
+        /// <param name="image">The image to calibrate from</param>
+        /// <param name="location">The point in the image where the marker is located</param>
+        /// <param name="color">The target color to detect</param>
+        /// <exception cref="ArgumentNullException">Thrown when image is null</exception>
         public void Calibrate(Bitmap image, DrawingPoint location, Color color)
         {
             if (image == null)
@@ -89,8 +118,10 @@ namespace ProjectClient.ShapeRecognizing
         }
 
         /// <summary>
-        /// Find a marker in the frame based on shape and color
+        /// Finds a marker in the frame based on shape and color similarity to the calibrated reference.
         /// </summary>
+        /// <param name="frame">The bitmap frame to search in</param>
+        /// <returns>The position of the detected marker, or null if not found</returns>
         public DrawingPoint? FindMarker(Bitmap frame)
         {
             if (!_isCalibrated || frame == null)
@@ -109,45 +140,19 @@ namespace ProjectClient.ShapeRecognizing
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in shape recognition: {ex.Message}");
-                _lastDetectedContour = null;
                 _lastMatchScore = 0;
                 return null;
             }
         }
 
-       
 
         /// <summary>
-        /// Set the sampling step for shape detection
+        /// Finds the contour at the calibration point in an HSV image.
+        /// Analyzes color mask around the specified location to identify the target contour.
         /// </summary>
-        public void SetSamplingStep(int step)
-        {
-            // No-op for compatibility (fixed sampling now)
-        }
-
-        /// <summary>
-        /// Configure adaptive threshold for shape detection
-        /// </summary>
-        public void ConfigureAdaptiveThreshold(double baseThreshold, double strictThreshold, double delaySeconds)
-        {
-            // No-op for compatibility (fixed thresholds now)
-        }
-
-        /// <summary>
-        /// Enable/disable adaptive color range
-        /// </summary>
-        public void EnableAdaptiveColorRange(bool enable)
-        {
-            // No-op for compatibility (fixed color ranges now)
-        }
-
-        #endregion
-
-        #region Private Implementation Details
-
-        /// <summary>
-        /// Find the contour at the calibration point
-        /// </summary>
+        /// <param name="hsv">The HSV image to analyze</param>
+        /// <param name="location">The point to find a contour near</param>
+        /// <returns>The detected contour points, or null if none found</returns>
         private OpenCvPoint[] FindCalibrationContour(Mat hsv, DrawingPoint location)
         {
             using (Mat colorMask = _colorMaskGenerator.CreateColorMask(hsv, _targetColor))
@@ -209,8 +214,13 @@ namespace ProjectClient.ShapeRecognizing
         }
 
         /// <summary>
-        /// Find the best matching contour in the frame
+        /// Finds the best matching contour in an HSV image based on color, shape, and position.
+        /// Applies area constraints and shape matching to identify the most likely marker.
         /// </summary>
+        /// <param name="hsv">The HSV image to analyze</param>
+        /// <param name="frameWidth">Width of the frame</param>
+        /// <param name="frameHeight">Height of the frame</param>
+        /// <returns>The center point of the best matching contour, or null if none found</returns>
         private DrawingPoint? FindBestMatchingContour(Mat hsv, int frameWidth, int frameHeight)
         {
             using (Mat colorMask = _colorMaskGenerator.CreateColorMask(hsv, _targetColor))
@@ -228,7 +238,6 @@ namespace ProjectClient.ShapeRecognizing
                 // No contours found
                 if (contours.Length == 0)
                 {
-                    _lastDetectedContour = null;
                     _lastMatchScore = 0;
                     return null;
                 }
@@ -286,7 +295,6 @@ namespace ProjectClient.ShapeRecognizing
                 // Update state and return result
                 if (bestContour != null)
                 {
-                    _lastDetectedContour = bestContour;
                     lastDetectedCenter = bestCenter;
                     _lastMatchScore = bestScore;
 
@@ -298,7 +306,6 @@ namespace ProjectClient.ShapeRecognizing
                 }
                 else
                 {
-                    _lastDetectedContour = null;
                     _lastMatchScore = 0;
                 }
 
@@ -307,8 +314,13 @@ namespace ProjectClient.ShapeRecognizing
         }
 
         /// <summary>
-        /// Calculate score for contour based on shape matching and position
+        /// Calculates a score for a contour based on shape matching and position proximity.
+        /// Higher scores indicate better matches to the reference shape and proximity to previous detections.
         /// </summary>
+        /// <param name="contour">The contour to evaluate</param>
+        /// <param name="centerX">X-coordinate of the contour center</param>
+        /// <param name="centerY">Y-coordinate of the contour center</param>
+        /// <returns>A score between 0.0 and approximately 1.3, where higher is better</returns>
         private double CalculateContourScore(OpenCvPoint[] contour, int centerX, int centerY)
         {
             // Calculate shape match score
@@ -336,8 +348,11 @@ namespace ProjectClient.ShapeRecognizing
         }
 
         /// <summary>
-        /// Apply morphological operations to clean up a mask
+        /// Applies morphological operations to clean up a binary mask.
+        /// Uses opening to remove small noise and closing to fill small holes.
         /// </summary>
+        /// <param name="input">The input binary mask</param>
+        /// <param name="output">The processed output mask</param>
         private static void ApplyMorphologicalOperations(Mat input, Mat output)
         {
             int kernelSize = 5;
@@ -351,7 +366,5 @@ namespace ProjectClient.ShapeRecognizing
                 Cv2.MorphologyEx(output, output, MorphTypes.Close, kernel, iterations: 1);
             }
         }
-
-        #endregion
     }
 }

@@ -25,6 +25,7 @@ namespace ProjectClient
         /// a property sent through each class starting from Program. which the client uses to communicate with the server
         /// </summary>
         private TcpServerCommunication tcpServer;
+
         /// <summary>
         /// constructor, initializes the TripleAuthentication form.
         /// </summary>
@@ -38,6 +39,7 @@ namespace ProjectClient
             MessageHandler.SetCurrentForm(this);
             this.allInfo = allInfo;
             this.loginOrRegister    = loginOrRegister;
+
         }
 
         /// <summary>
@@ -62,6 +64,16 @@ namespace ProjectClient
         private void verify_Click(object sender, EventArgs e)
         {
             tcpServer.SendMessage("Verify",code.Text + '\t' + captcha.Text);
+        }
+
+        private void backToLogin_Click(object sender, EventArgs e)
+        {
+            if (loginOrRegister)
+            {
+                LoginForm BackToGame = new LoginForm(tcpServer, false);
+                this.Hide();
+                BackToGame.ShowDialog();
+            }
         }
     }
 }

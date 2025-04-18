@@ -255,6 +255,10 @@ namespace ProjectClient
                 }
             }
         }
+        /// <summary>
+        /// Processes a list of drawings received from the server and displays them in a dialog
+        /// </summary>
+        /// <param name="drawingsListJson">JSON string containing the list of drawings</param>
         private void HandleDrawingsList(string drawingsListJson)
         {
             SafeInvoke(() =>
@@ -290,7 +294,10 @@ namespace ProjectClient
                 }
             });
         }
-
+        /// <summary>
+        /// Handles drawing data received from the server
+        /// </summary>
+        /// <param name="imageData">The drawing data received from the server</param>
         private void HandleDrawingData(string imageData)
         {
             SafeInvoke(() => {
@@ -310,7 +317,10 @@ namespace ProjectClient
                 }
             });
         }
-
+        /// <summary>
+        /// Displays a dialog showing the user's saved drawings and options to load or delete them
+        /// </summary>
+        /// <param name="drawings">List of drawing metadata to display</param>
         private void ShowDrawingsListDialog(List<DrawingMetadata> drawings)
         {
             if (drawings == null || drawings.Count == 0)
@@ -440,7 +450,11 @@ namespace ProjectClient
             // Show the dialog
             drawingsDialog.ShowDialog();
         }
-
+        /// <summary>
+        /// Extracts the drawing name from a list item string
+        /// </summary>
+        /// <param name="listItem">The list item string in format "Name (Last Modified: date)"</param>
+        /// <returns>The extracted drawing name</returns>
         private string ExtractDrawingName(string listItem)
         {
             // Extract drawing name from format "Name (Last Modified: date)"

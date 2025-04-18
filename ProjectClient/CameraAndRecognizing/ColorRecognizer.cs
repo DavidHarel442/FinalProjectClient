@@ -11,22 +11,56 @@ using AForgePoint = AForge.Point;
 namespace ProjectClient.CameraAndRecognizing
 {
     /// <summary>
-    /// Class responsible for color-based marker detection
+    /// Class responsible for color-based marker detection in camera frames.
+    /// Provides functionality for calibrating to specific colors, finding markers 
+    /// based on color similarity, and automatically adjusting thresholds for optimal detection.
     /// </summary>
     public class ColorRecognizer
     {
-        private int baseColorThreshold = 50;
+
+
+        /// <summary>
+        /// More restrictive threshold used when precision is needed
+        /// </summary>
         private int strictColorThreshold = 30;
+
+        /// <summary>
+        /// Current active threshold value being used for detection
+        /// </summary>
         private int currentColorThreshold = 50;
+
+        /// <summary>
+        /// Timestamp of the last threshold adjustment for timing control
+        /// </summary>
         private DateTime? lastColorThresholdAdjustment = null;
-        // Color detection settings
-        private const int DEFAULT_COLOR_THRESHOLD = 50;
-        private int colorThreshold = DEFAULT_COLOR_THRESHOLD;
+
+
+      
+
+        /// <summary>
+        /// Step size for pixel sampling (higher values improve performance but reduce accuracy)
+        /// </summary>
         private int samplingStep = 2;
 
         /// <summary>
-        /// Calibrates the detector by finding the dominant color at the specified location
+        /// Minimum time in milliseconds between threshold adjustments
         /// </summary>
+        private const int THRESHOLD_ADJUSTMENT_INTERVAL_MS = 500;
+
+        /// <summary>
+        /// Maximum threshold value allowed
+        /// </summary>
+        private const int MAX_THRESHOLD = 150;
+
+        /// <summary>
+        /// Calibrates the detector by finding the dominant color at the specified location.
+        /// Takes a sample area around the provided point and determines the most representative color.
+        /// </summary>
+        /// <param name="image">The bitmap image to calibrate from</param>
+        /// <param name="location">The point in the image where the marker is located</param>
+        /// <returns>The calibrated color for marker detection</returns>
+        /// <exception cref="ArgumentNullException">Thrown when image is null</exception>
+        /// <exception cref="ArgumentException">Thrown when location is outside image bounds</exception>
         public Color Calibrate(Bitmap image, DrawingPoint location)
         {
             Console.WriteLine($"Calibrating at {location.X},{location.Y} in the image");
@@ -122,15 +156,17 @@ namespace ProjectClient.CameraAndRecognizing
 
             return dominantColor;
         }
-        public void ResetThresholds()
-        {
-            currentColorThreshold = baseColorThreshold;
-            lastColorThresholdAdjustment = null;
-            Console.WriteLine($"Color thresholds reset to fixed default: {baseColorThreshold}");
-        }
+
+
+
         /// <summary>
-        /// Find a marker in the frame based on color similarity to the target color
+        /// Finds a marker in the frame based on color similarity to the target color.
+        /// Uses fast bitmap access for performance and calculates weighted centroid of matching pixels.
         /// </summary>
+        /// <param name="frame">The bitmap frame to search in</param>
+        /// <param name="targetColor">The target color to look for</param>
+        /// <param name="samplingStep">The step size for pixel sampling (higher = faster but less accurate)</param>
+        /// <returns>The point where the marker was found, or null if not detected</returns>
         public DrawingPoint? FindMarker(Bitmap frame, Color targetColor, int samplingStep)
         {
             if (frame == null || targetColor == null)
@@ -172,11 +208,11 @@ namespace ProjectClient.CameraAndRecognizing
 
                         // Compare color distance
                         int distance = ColorDistance(currentColor, targetColor);
-                        if (distance < colorThreshold)
+                        if (distance < currentColorThreshold)
                         {
                             // Calculate a weight based on how close the color match is
                             // Closer matches get higher weights
-                            int weight = colorThreshold - distance;
+                            int weight = currentColorThreshold - distance;
 
                             // Regular averaging
                             sumX += x;
@@ -227,24 +263,24 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Set the sampling step for color detection
+        /// Sets the sampling step for color detection.
+        /// Larger values improve performance but reduce detection precision.
         /// </summary>
+        /// <param name="step">The sampling step size (minimum 1)</param>
         public void SetSamplingStep(int step)
         {
             this.samplingStep = Math.Max(1, step);
         }
 
-        /// <summary>
-        /// Set the color threshold for detection
-        /// </summary>
-        public void SetColorThreshold(int threshold)
-        {
-            this.colorThreshold = Math.Max(5, threshold);
-        }
+
 
         /// <summary>
-        /// Calculate the distance between two colors
+        /// Calculates the distance between two colors using a weighted combination 
+        /// of RGB Euclidean distance and HSB components to better match human color perception.
         /// </summary>
+        /// <param name="c1">The first color</param>
+        /// <param name="c2">The second color</param>
+        /// <returns>A weighted distance value representing color similarity</returns>
         private int ColorDistance(Color c1, Color c2)
         {
             // Basic Euclidean distance in RGB space
@@ -273,8 +309,14 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Convert RGB values to HSB (Hue, Saturation, Brightness)
+        /// Converts RGB values to HSB (Hue, Saturation, Brightness) color space.
         /// </summary>
+        /// <param name="r">The red component (0-255)</param>
+        /// <param name="g">The green component (0-255)</param>
+        /// <param name="b">The blue component (0-255)</param>
+        /// <param name="hue">Output parameter for hue (0.0-1.0)</param>
+        /// <param name="saturation">Output parameter for saturation (0.0-1.0)</param>
+        /// <param name="bright">Output parameter for brightness (0.0-1.0)</param>
         private void RgbToHsb(int r, int g, int b, out double hue, out double saturation, out double bright)
         {
             // Normalize R,G,B values
@@ -328,17 +370,6 @@ namespace ProjectClient.CameraAndRecognizing
             }
         }
 
-        public void ConfigureAdaptiveThreshold(int baseThreshold, int strictThreshold)
-        {
-            // Just set the base threshold and ignore the strict threshold
-            baseColorThreshold = Math.Max(20, baseThreshold);
-            currentColorThreshold = baseColorThreshold;
-            Console.WriteLine($"Color threshold set to fixed value: {baseColorThreshold}");
-        }
-        /// <summary>
-        /// Update color threshold based on marker detection status with specific timing
-        /// </summary>
-        
+
     }
 }
-

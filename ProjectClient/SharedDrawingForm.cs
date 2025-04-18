@@ -9,39 +9,74 @@ using System.Windows.Forms;
 
 namespace ProjectClient
 {
+    /// <summary>
+    /// Main form responsible for the shared drawing board functionality.
+    /// Coordinates camera input, marker detection, drawing tools, and network communication.
+    /// </summary>
     public partial class SharedDrawingForm : Form
-    {// this form is incharge of the Shared Drawing Board
+    {
+        /// <summary>
+        /// The point in the camera feed where calibration is being performed
+        /// </summary>
         public Point? calibrationPoint = null;
+
+        /// <summary>
+        /// Timestamp when calibration was last performed
+        /// </summary>
         public DateTime calibrationTime = DateTime.MinValue;
 
-        public MarkerRecognizer markerRecognizer => cameraManager?.markerRecognizer;
-        private DateTime? markerLostStartTime = null;
-        private int markerLostTimeoutSeconds = 3; // Auto-stop drawing after 3 seconds of marker loss
         /// <summary>
-        /// object incharge of communication with the server
+        /// Gets the marker recognizer from the camera manager
+        /// </summary>
+        public MarkerRecognizer markerRecognizer => cameraManager?.markerRecognizer;
+
+        /// <summary>
+        /// Timestamp when the marker was first lost, or null if the marker is currently detected
+        /// </summary>
+        private DateTime? markerLostStartTime = null;
+
+
+        /// <summary>
+        /// Object responsible for communication with the server
         /// </summary>
         public TcpServerCommunication tcpServer;
+
         /// <summary>
-        /// object incharge of managing the camera
+        /// Object responsible for managing the camera and marker detection
         /// </summary>
         private CameraManager cameraManager;
+
         /// <summary>
-        /// object incharge of managing the drawing
+        /// Object responsible for managing the drawing operations
         /// </summary>
         public DrawingManager drawingManager;
 
-        // Add a boolean to track calibration mode
+        /// <summary>
+        /// Flag indicating whether the application is in calibration mode
+        /// </summary>
         public bool isCalibrationMode = false;
 
+        /// <summary>
+        /// Flag indicating whether marker drawing is enabled
+        /// </summary>
         public bool isMarkerDrawingEnabled = false;
+
+        /// <summary>
+        /// The last detected position of the marker
+        /// </summary>
         private Point? lastMarkerPosition = null;
+
+        /// <summary>
+        /// Flag indicating whether the space bar is currently pressed
+        /// </summary>
         private bool isSpaceBarPressed = false;
 
         /// <summary>
-        /// constructor, inizialises form
+        /// Initializes a new instance of the SharedDrawingForm class.
+        /// Sets up camera, drawing manager, and network communication.
         /// </summary>
-        /// <param name="tcpServer"></param>
-        /// <param name="username1"></param>
+        /// <param name="tcpServer">The TCP communication object for server interaction</param>
+        /// <param name="username1">The username of the current user</param>
         public SharedDrawingForm(TcpServerCommunication tcpServer, string username1)
         {
             try
@@ -51,10 +86,8 @@ namespace ProjectClient
                 username.Text = username1;
                 MessageHandler.SetCurrentForm(this);
                 drawingManager = new DrawingManager(drawingPic);
-                cameraManager = new CameraManager(Camera, drawingManager, this);
+                cameraManager = new CameraManager(Camera, this);
                 drawingManager.DrawingActionPerformed += DrawingManager_DrawingActionPerformed;
-
-
 
                 tcpServer.SendMessage("RequestFullDrawingState", "");
 
@@ -67,13 +100,12 @@ namespace ProjectClient
             }
         }
 
-
-
         /// <summary>
-        /// event called when pressing on the ShowCamera button, it starts/stops the camera depends on current state.
+        /// Event handler for the ShowCamera button.
+        /// Starts or stops the camera based on current state.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void ShowCamera_Click(object sender, EventArgs e)
         {
             try
@@ -111,13 +143,12 @@ namespace ProjectClient
             }
         }
 
-
         /// <summary>
-        /// after action is performed this function is called, it sends the server the action serialized
-        /// it is called automatically thanks to line 40
+        /// Event handler for when a drawing action is performed.
+        /// Sends the serialized drawing action to the server.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e">in this case it contains the object of the DrawingAction</param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The drawing action that was performed</param>
         private void DrawingManager_DrawingActionPerformed(object sender, DrawingAction e)
         {
             try
@@ -129,13 +160,12 @@ namespace ProjectClient
                 Console.WriteLine($"Error sending drawing action: {ex.Message}");
             }
         }
+
         /// <summary>
         /// Handles the received drawing state by converting a Base64 encoded image string back into a bitmap
         /// and updating the drawing board.
-        /// it is doing so by -> converting the base64 string back to byteArray -> creates a memory stream and puts all the bytes there
-        /// -> creates a bitmap with the stream -> updates the pictureBox's image with the bitmap. and then refreshes
         /// </summary>
-        /// <param name="base64Image"></param>
+        /// <param name="base64Image">The Base64 encoded image string</param>
         public void HandleFullDrawingState(string base64Image)
         {
             try
@@ -169,50 +199,51 @@ namespace ProjectClient
         }
 
         /// <summary>
-        /// this function is called when the user receives a drawingAction that another user performed, it will be accepted from the server.
-        /// it calles the function "ApplyDrawingAction" that exists in the "DrawingManager" class,
-        /// that function is responsible for actually applying the action on the canvas.
+        /// Applies a drawing action received from another user via the server.
         /// </summary>
-        /// <param name="action"></param>
+        /// <param name="action">The drawing action to apply</param>
         public void ApplyDrawingAction(DrawingAction action)
         {
             try
             {
                 drawingManager.ApplyDrawingAction(action);
-                drawingPic.Refresh();  // Add this line
+                drawingPic.Refresh();  // Refresh the picture box
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error applying drawing action: {ex.Message}");
             }
         }
+
         /// <summary>
-        /// event called when the users starts holding on the canvas, it sets the drawing to true
+        /// Event handler for mouse down on the drawing canvas.
+        /// Initiates drawing and sets the start point.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The mouse event data</param>
         private void drawingPic_MouseDown(object sender, MouseEventArgs e)
         {
             drawingManager.isDrawing = true;
             drawingManager.lastDrawingPoint = e.Location;
         }
+
         /// <summary>
-        /// event called when the users stops holding on the canvas, it sets the drawing to false
+        /// Event handler for mouse up on the drawing canvas.
+        /// Ends the current drawing operation.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The mouse event data</param>
         private void drawingPic_MouseUp(object sender, MouseEventArgs e)
         {
             drawingManager.isDrawing = false;
-
         }
+
         /// <summary>
-        /// event called when someone is moving their mouse on the pictureBox canvas, it will only do something when the user is holding.
-        /// it calles the function "Draw" which is drawing locally, and it sends the server the drawingAction,
-        /// which the server then sends it to the rest of the clients
+        /// Event handler for mouse movement on the drawing canvas.
+        /// Draws lines when the mouse is held down and sends drawing actions to the server.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The mouse event data</param>
         private void drawingPic_MouseMove(object sender, MouseEventArgs e)
         {
             if (drawingManager.isDrawing)
@@ -235,20 +266,24 @@ namespace ProjectClient
                 }
             }
         }
+
         /// <summary>
-        /// event called when pressing on the eraser, it sets drawing mode to eraser
+        /// Event handler for the eraser button.
+        /// Sets the drawing mode to eraser.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void btn_eraser_Click(object sender, EventArgs e)
         {
             drawingManager.SetDrawingMode(2);
         }
+
         /// <summary>
-        /// event called when pressing on the clear button, it clears the canvas to all white.
+        /// Event handler for the clear button.
+        /// Clears the canvas and sends a clear action to the server.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void btn_Clear_Click(object sender, EventArgs e)
         {
             try
@@ -272,41 +307,48 @@ namespace ProjectClient
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
         /// <summary>
-        /// event called when user presses on color_picker picture box,
-        /// it takes the location he pressed on and the pixel of that location and color and changes the pencils color to the color, (function called PickColor)
+        /// Event handler for clicks on the color picker.
+        /// Selects a color from the color picker and updates the current pen color.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The mouse event data</param>
         private void color_picker_MouseClick(object sender, MouseEventArgs e)
         {
             Color selectedColor = drawingManager.PickColor(color_picker, e.Location);
             pic_color.BackColor = selectedColor;
             drawingManager.SetPenColor(selectedColor);
         }
+
         /// <summary>
-        /// event called when user presses on pencil button, it sets drawing mode to pencil
+        /// Event handler for the pencil button.
+        /// Sets the drawing mode to pencil.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void btn_pencil_Click(object sender, EventArgs e)
         {
             drawingManager.SetDrawingMode(1);
         }
+
         /// <summary>
-        /// event called when pressed on the fill button, changes drawing mode to fill
+        /// Event handler for the fill button.
+        /// Sets the drawing mode to fill.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void btn_fill_Click(object sender, EventArgs e)
         {
             drawingManager.SetDrawingMode(7);
         }
+
         /// <summary>
-        /// event called when the user changes the pen size
+        /// Event handler for the pen size dropdown.
+        /// Updates the pen size when a new size is selected.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void PenSize_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (float.TryParse(PenSize.Text, out float size))
@@ -314,11 +356,13 @@ namespace ProjectClient
                 drawingManager.SetPenSize(size);
             }
         }
+
         /// <summary>
-        /// event called when the user changes the eraser size
+        /// Event handler for the eraser size dropdown.
+        /// Updates the eraser size when a new size is selected.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void EraserSize_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (float.TryParse(EraserSize.Text, out float size))
@@ -326,13 +370,13 @@ namespace ProjectClient
                 drawingManager.SetEraserSize(size);
             }
         }
+
         /// <summary>
-        /// event called  when clicking on the drawing, it will only do something when the drawing mode is 7,
-        /// it calles the function FillAsync which is responsible for the actual filling, 
-        /// and it sends the server a notice that a fill action was performed, the server then sends it to the rest of the users
+        /// Event handler for clicks on the drawing canvas.
+        /// Handles fill operations in fill mode.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The mouse event data</param>
         private async void drawingPic_MouseClick(object sender, MouseEventArgs e)
         {
             if (drawingManager.currentToolMode == 7)  // Fill mode
@@ -356,17 +400,25 @@ namespace ProjectClient
                 }
             }
         }
+
         /// <summary>
-        /// event that happens when they close form, its main purpose is to stop camera
+        /// Event handler for form closing.
+        /// Ensures the camera is stopped when the form is closed.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The form closing event data</param>
         private void SharedDrawingForm_FormClosing_1(object sender, FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
             cameraManager.StopCamera();
         }
 
+        /// <summary>
+        /// Event handler for the Start Drawing button.
+        /// Toggles marker-based drawing mode on and off.
+        /// </summary>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void StartDrawing_Click(object sender, EventArgs e)
         {
             try
@@ -391,7 +443,6 @@ namespace ProjectClient
                     // Reset recognizer state if available
                     if (markerRecognizer != null)
                     {
-                        markerRecognizer.SetDrawingStatus(true);
                         markerRecognizer.ResetPositionHistory();
                     }
 
@@ -410,7 +461,6 @@ namespace ProjectClient
                     // Reset recognizer state if available
                     if (markerRecognizer != null)
                     {
-                        markerRecognizer.SetDrawingStatus(false);
                         markerRecognizer.ResetPositionHistory();
                     }
 
@@ -424,6 +474,12 @@ namespace ProjectClient
             }
         }
 
+        /// <summary>
+        /// Event handler for the Calibrate Color button.
+        /// Initiates calibration mode for marker color detection.
+        /// </summary>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void btnCalibrateColor_Click(object sender, EventArgs e)
         {
             // Enter calibration mode
@@ -436,6 +492,12 @@ namespace ProjectClient
             Label3.ForeColor = Color.Yellow;
         }
 
+        /// <summary>
+        /// Event handler for clicks on the camera feed.
+        /// Handles marker calibration when in calibration mode.
+        /// </summary>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void Camera_Click(object sender, EventArgs e)
         {
             if (isCalibrationMode)
@@ -511,6 +573,13 @@ namespace ProjectClient
                 }
             }
         }
+
+        /// <summary>
+        /// Processes the detected marker position from the camera feed.
+        /// Translates camera coordinates to drawing canvas coordinates and handles drawing.
+        /// </summary>
+        /// <param name="markerPosition">The detected marker position in camera coordinates</param>
+        /// <param name="cameraSize">The size of the camera feed</param>
         public void ProcessMarkerPosition(Point markerPosition, Size cameraSize)
         {
             // Check if drawing mode is enabled (Start Drawing button pressed)
@@ -585,6 +654,15 @@ namespace ProjectClient
                 Console.WriteLine($"Error processing marker position: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Translates coordinates from one coordinate system to another.
+        /// Used to convert between camera coordinates and drawing canvas coordinates.
+        /// </summary>
+        /// <param name="source">The source point</param>
+        /// <param name="sourceSize">The size of the source coordinate system</param>
+        /// <param name="targetSize">The size of the target coordinate system</param>
+        /// <returns>The translated point in the target coordinate system</returns>
         private Point TranslateCoordinates(Point source, Size sourceSize, Size targetSize)
         {
             // Calculate coordinates normally now that the camera view is already flipped
@@ -604,6 +682,12 @@ namespace ProjectClient
             return new Point(x, y);
         }
 
+        /// <summary>
+        /// Event handler for the Save Drawing button.
+        /// Saves the current drawing to the server with the specified name.
+        /// </summary>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void SaveDrawing_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(drawingName.Text))
@@ -627,12 +711,12 @@ namespace ProjectClient
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
         /// <summary>
-        /// this function returns the drawing canvas, to later be sent to the one who asked for it/to save the drawing .
-        /// it is done by taking the current canvas and transfering it all to a MemorySteam,
-        /// then taking it from the MemoryStream into a bytes array and then to base64 and then sending it to the server. with the nickname of the one who asked for it
+        /// Converts the current drawing to a Base64 encoded string.
+        /// Used for saving drawings and sharing drawing state.
         /// </summary>
-        /// <param name="clientNick"></param>
+        /// <returns>A Base64 encoded string representation of the drawing</returns>
         public string GetImageAsString()
         {
             try
@@ -647,10 +731,17 @@ namespace ProjectClient
             }
             catch (Exception ex)
             {
+
                 MessageBox.Show($"Error sending full drawing state: {ex.Message}");
             }
             return null;
         }
+
+        /// <summary>
+        /// Override for key down events.
+        /// Handles space bar press for marker drawing.
+        /// </summary>
+        /// <param name="e">The key event data</param>
         protected override void OnKeyDown(KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Space)
@@ -662,6 +753,11 @@ namespace ProjectClient
             base.OnKeyDown(e);
         }
 
+        /// <summary>
+        /// Override for key up events.
+        /// Handles space bar release for marker drawing.
+        /// </summary>
+        /// <param name="e">The key event data</param>
         protected override void OnKeyUp(KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Space)
@@ -672,12 +768,25 @@ namespace ProjectClient
             }
             base.OnKeyUp(e);
         }
+
+        /// <summary>
+        /// Processes command keys for the form.
+        /// </summary>
+        /// <param name="msg">The window message to process</param>
+        /// <param name="keyData">The key data</param>
+        /// <returns>True if the key was processed, false otherwise</returns>
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             // Keep this for other command keys
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
+        /// <summary>
+        /// Event handler for the Load Drawing button.
+        /// Requests a list of available drawings from the server.
+        /// </summary>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="e">The event data</param>
         private void btnLoadDrawing_Click(object sender, EventArgs e)
         {
             // Request drawings list from server

@@ -5,36 +5,67 @@ using OpenCvPoint = OpenCvSharp.Point;
 namespace ProjectClient.ShapeRecognizing
 {
     /// <summary>
-    /// Analyzes and classifies shapes based on contour properties
+    /// Analyzes and classifies shapes based on contour properties.
+    /// Provides methods for shape recognition, classification, and comparison 
+    /// using geometric properties like area, perimeter, and vertex count.
     /// </summary>
     public class ShapeAnalyzer
     {
-
         /// <summary>
-        /// Shape type enumeration for better readability
+        /// Shape type enumeration for better readability and classification.
+        /// Defines the supported geometric shapes that can be recognized.
         /// </summary>
         public enum ShapeType
         {
+            /// <summary>Unknown or unclassifiable shape</summary>
             Unknown = -1,
+
+            /// <summary>Circle or near-circular shape</summary>
             Circle = 0,
+
+            /// <summary>Triangle (3 vertices)</summary>
             Triangle = 1,
+
+            /// <summary>Rectangle or square (4 vertices)</summary>
             Rectangle = 2,
+
+            /// <summary>General polygon with 5+ vertices</summary>
             Polygon = 3
         }
 
-
-
-        // Reference shape properties
+        /// <summary>
+        /// Gets the type of the reference shape used for comparison
+        /// </summary>
         public ShapeType ReferenceType { get; private set; } = ShapeType.Unknown;
-        public double ReferenceArea { get; private set; } = 0;
-        public double ReferenceCompactness { get; private set; } = 0;
-        public int ReferenceVertices { get; private set; } = 0;
-
-
 
         /// <summary>
-        /// Analyzes a reference shape to extract its characteristics
+        /// Gets the area of the reference shape in square pixels
         /// </summary>
+        public double ReferenceArea { get; private set; } = 0;
+
+        /// <summary>
+        /// Gets the compactness (circularity) of the reference shape.
+        /// A perfect circle has a compactness of 1.0.
+        /// </summary>
+        public double ReferenceCompactness { get; private set; } = 0;
+
+        /// <summary>
+        /// Gets the number of vertices in the approximated reference shape
+        /// </summary>
+        public int ReferenceVertices { get; private set; } = 0;
+
+        /// <summary>
+        /// Analyzes a reference shape to extract its characteristics.
+        /// Sets the reference properties that will be used for shape matching.
+        /// </summary>
+        /// <param name="contour">The contour points representing the shape to analyze</param>
+        /// <remarks>
+        /// This method calculates key geometric properties of the shape including:
+        /// - Area: The enclosed area within the contour
+        /// - Compactness: A measure of how circular the shape is
+        /// - Vertices: The number of vertices in the approximated shape
+        /// The results are stored as reference values for later comparison.
+        /// </remarks>
         public void AnalyzeReferenceShape(OpenCvPoint[] contour)
         {
             // Calculate area of the contour
@@ -55,8 +86,18 @@ namespace ProjectClient.ShapeRecognizing
         }
 
         /// <summary>
-        /// Calculate how well a contour matches our reference shape
+        /// Calculates how well a contour matches the reference shape.
+        /// Compares geometric properties to determine a similarity score.
         /// </summary>
+        /// <param name="contour">The contour points representing the shape to match</param>
+        /// <returns>A similarity score between 0.0 (no match) and 1.0 (perfect match)</returns>
+        /// <remarks>
+        /// The matching score is calculated using a weighted combination of:
+        /// - Shape type match (40%)
+        /// - Area similarity (20%)
+        /// - Compactness similarity (20%)
+        /// - Vertex count similarity (20%)
+        /// </remarks>
         public double CalculateShapeMatchScore(OpenCvPoint[] contour)
         {
             // Calculate basic shape properties
@@ -91,16 +132,20 @@ namespace ProjectClient.ShapeRecognizing
         }
 
         /// <summary>
-        /// Get a string name for the reference shape type
+        /// Gets a string name for the current reference shape type.
         /// </summary>
+        /// <returns>The name of the reference shape type</returns>
         public string GetShapeTypeName()
         {
             return GetShapeTypeName(ReferenceType);
         }
 
         /// <summary>
-        /// Get a string name for a shape type
+        /// Gets a string name for a given shape type.
+        /// Converts the ShapeType enum value to a human-readable string.
         /// </summary>
+        /// <param name="shapeType">The shape type to get a name for</param>
+        /// <returns>A string representing the shape type</returns>
         public string GetShapeTypeName(ShapeType shapeType)
         {
             switch (shapeType)
@@ -113,11 +158,20 @@ namespace ProjectClient.ShapeRecognizing
             }
         }
 
-
-
         /// <summary>
-        /// Classify a shape based on compactness and vertex count
+        /// Classifies a shape based on its compactness and vertex count.
+        /// Uses geometric properties to determine the most likely shape type.
         /// </summary>
+        /// <param name="compactness">The compactness (circularity) of the shape</param>
+        /// <param name="vertices">The number of vertices in the approximated shape</param>
+        /// <returns>The classified shape type</returns>
+        /// <remarks>
+        /// Classification rules:
+        /// - Circle: High compactness (>0.85) and many vertices (≥8)
+        /// - Triangle: Exactly 3 vertices
+        /// - Rectangle: Exactly 4 vertices
+        /// - Polygon: Any other shape with distinct vertices
+        /// </remarks>
         private static ShapeType ClassifyShape(double compactness, int vertices)
         {
             if (compactness > 0.85 && vertices >= 8)
@@ -137,6 +191,5 @@ namespace ProjectClient.ShapeRecognizing
                 return ShapeType.Polygon;
             }
         }
-
     }
 }

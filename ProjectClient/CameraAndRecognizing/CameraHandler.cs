@@ -11,30 +11,63 @@ using System.Windows.Forms;
 namespace ProjectClient.CameraAndRecognizing
 {
     /// <summary>
-    /// Handles camera initialization, management, and frame capture
+    /// Handles camera initialization, management, and frame capture from video input devices.
+    /// Provides methods for starting and stopping the camera, adjusting quality settings,
+    /// and events for processing captured frames.
     /// </summary>
     public class CameraHandler
     {
-        // Camera devices
+        /// <summary>
+        /// Collection of available video input devices on the system
+        /// </summary>
         private FilterInfoCollection videoDevices;
+
+        /// <summary>
+        /// The active video capture device
+        /// </summary>
         private VideoCaptureDevice videoSource;
 
-        // Camera settings
+        /// <summary>
+        /// Target width for video capture (in pixels)
+        /// </summary>
         private int captureWidth = 640;
+
+        /// <summary>
+        /// Target height for video capture (in pixels)
+        /// </summary>
         private int captureHeight = 480;
+
+        /// <summary>
+        /// Flag indicating whether to process every frame or skip alternate frames
+        /// </summary>
         private bool skipFrames = false;
+
+        /// <summary>
+        /// Counter used when frame skipping is enabled
+        /// </summary>
         private int frameCounter = 0;
 
-        // Events
+        /// <summary>
+        /// Event raised when a new frame is captured from the camera.
+        /// Subscribers receive the captured frame as a Bitmap.
+        /// </summary>
         public event EventHandler<FrameCapturedEventArgs> FrameCaptured;
 
         /// <summary>
-        /// Event arguments for the FrameCaptured event
+        /// Event arguments class for the FrameCaptured event.
+        /// Contains the captured frame as a Bitmap.
         /// </summary>
         public class FrameCapturedEventArgs : EventArgs
         {
+            /// <summary>
+            /// Gets the captured frame
+            /// </summary>
             public Bitmap Frame { get; }
 
+            /// <summary>
+            /// Initializes a new instance of the FrameCapturedEventArgs class
+            /// </summary>
+            /// <param name="frame">The captured frame as a Bitmap</param>
             public FrameCapturedEventArgs(Bitmap frame)
             {
                 Frame = frame;
@@ -42,13 +75,26 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Gets whether the camera is currently running
+        /// Gets a value indicating whether the camera is currently running
         /// </summary>
+        /// <value>
+        /// <c>true</c> if the camera is running; otherwise, <c>false</c>
+        /// </value>
         public bool IsRunning => videoSource != null && videoSource.IsRunning;
 
         /// <summary>
-        /// Find and start the camera
+        /// Initializes and starts the camera capture process.
+        /// Finds available video devices, selects the first one,
+        /// configures resolution settings, and begins capturing frames.
         /// </summary>
+        /// <returns>
+        /// <c>true</c> if the camera was successfully started; otherwise, <c>false</c>
+        /// </returns>
+        /// <remarks>
+        /// This method attaches the <see cref="VideoSource_NewFrame"/> event handler
+        /// to process each frame captured from the camera.
+        /// </remarks>
+        /// <exception cref="Exception">Thrown when an error occurs during camera initialization</exception>
         public bool StartCamera()
         {
             try
@@ -83,7 +129,8 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Stop the camera
+        /// Stops the camera and releases associated resources.
+        /// Unhooks event handlers and signals the video source to stop.
         /// </summary>
         public void StopCamera()
         {
@@ -96,8 +143,12 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Set camera quality settings
+        /// Updates camera quality settings and applies them.
+        /// If the camera is running, it will be stopped and restarted with the new settings.
         /// </summary>
+        /// <param name="width">The target capture width in pixels</param>
+        /// <param name="height">The target capture height in pixels</param>
+        /// <param name="skipFrames">Whether to enable frame skipping for performance</param>
         public void SetQualitySettings(int width, int height, bool skipFrames)
         {
             this.captureWidth = width;
@@ -117,8 +168,14 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Sets camera to use a lower resolution to improve performance
+        /// Configures the camera to use an appropriate resolution close to the target dimensions.
+        /// Searches through available video capabilities and selects the closest match to the
+        /// configured capture width and height.
         /// </summary>
+        /// <remarks>
+        /// Continues with default settings if an error occurs or no suitable resolution is found.
+        /// </remarks>
+        /// <exception cref="Exception">May be thrown when accessing video capabilities</exception>
         private void SetLowResolutionCapabilities()
         {
             try
@@ -152,8 +209,16 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Event handler for new camera frames
+        /// Event handler that processes each new frame received from the camera.
+        /// Implements frame skipping if enabled, creates a copy of the frame, flips it
+        /// for a more intuitive view, and raises the FrameCaptured event.
         /// </summary>
+        /// <param name="sender">The source of the event</param>
+        /// <param name="eventArgs">The event data containing the new frame</param>
+        /// <remarks>
+        /// The original frame is cloned to avoid threading issues, as the source
+        /// frame may be modified by the camera source before processing is complete.
+        /// </remarks>
         private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             // Skip frames if enabled
@@ -187,16 +252,23 @@ namespace ProjectClient.CameraAndRecognizing
         }
 
         /// <summary>
-        /// Trigger the FrameCaptured event
+        /// Raises the FrameCaptured event with the provided frame
         /// </summary>
+        /// <param name="frame">The captured and processed frame to provide to event subscribers</param>
         protected virtual void OnFrameCaptured(Bitmap frame)
         {
             FrameCaptured?.Invoke(this, new FrameCapturedEventArgs(frame));
         }
 
         /// <summary>
-        /// Flips an image horizontally
+        /// Creates a horizontally mirrored version of the source image
         /// </summary>
+        /// <param name="source">The original bitmap to flip</param>
+        /// <returns>A new Bitmap containing the flipped image</returns>
+        /// <remarks>
+        /// The mirroring effect is achieved by applying a transformation matrix
+        /// that scales by -1 in the X direction.
+        /// </remarks>
         private Bitmap FlipImageHorizontally(Bitmap source)
         {
             // Create a new bitmap with the same dimensions

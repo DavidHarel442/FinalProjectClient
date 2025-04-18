@@ -35,6 +35,7 @@
             this.captchaLabel = new System.Windows.Forms.Label();
             this.captcha = new System.Windows.Forms.TextBox();
             this.captchaImage = new System.Windows.Forms.PictureBox();
+            this.backToLogin = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.captchaImage)).BeginInit();
             this.SuspendLayout();
             // 
@@ -95,7 +96,7 @@
             this.captchaLabel.AutoSize = true;
             this.captchaLabel.Font = new System.Drawing.Font("Nirmala UI", 9.75F, System.Drawing.FontStyle.Bold);
             this.captchaLabel.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(164)))), ((int)(((byte)(165)))), ((int)(((byte)(169)))));
-            this.captchaLabel.Location = new System.Drawing.Point(101, 253);
+            this.captchaLabel.Location = new System.Drawing.Point(101, 263);
             this.captchaLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.captchaLabel.Name = "captchaLabel";
             this.captchaLabel.Size = new System.Drawing.Size(82, 17);
@@ -122,12 +123,26 @@
             this.captchaImage.TabIndex = 82;
             this.captchaImage.TabStop = false;
             // 
+            // backToLogin
+            // 
+            this.backToLogin.AutoSize = true;
+            this.backToLogin.Font = new System.Drawing.Font("Nirmala UI", 9.75F, System.Drawing.FontStyle.Bold);
+            this.backToLogin.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(164)))), ((int)(((byte)(165)))), ((int)(((byte)(169)))));
+            this.backToLogin.Location = new System.Drawing.Point(101, 577);
+            this.backToLogin.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.backToLogin.Name = "backToLogin";
+            this.backToLogin.Size = new System.Drawing.Size(94, 17);
+            this.backToLogin.TabIndex = 83;
+            this.backToLogin.Text = "Back To Login";
+            this.backToLogin.Click += new System.EventHandler(this.backToLogin_Click);
+            // 
             // TripleAuthentication
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 17F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.White;
             this.ClientSize = new System.Drawing.Size(323, 632);
+            this.Controls.Add(this.backToLogin);
             this.Controls.Add(this.captchaImage);
             this.Controls.Add(this.captcha);
             this.Controls.Add(this.captchaLabel);
@@ -156,5 +171,6 @@
         private System.Windows.Forms.Label captchaLabel;
         private System.Windows.Forms.TextBox captcha;
         private System.Windows.Forms.PictureBox captchaImage;
+        private System.Windows.Forms.Label backToLogin;
     }
 }
